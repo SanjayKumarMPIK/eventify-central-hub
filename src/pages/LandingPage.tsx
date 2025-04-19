@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -36,7 +35,7 @@ const LandingPage = () => {
                     onClick={() => navigate('/register')}
                     size="lg"
                     variant="outline"
-                    className="border-white text-white hover:bg-white/10"
+                    className="border-white text-white hover:bg-white/20 hover:text-white"
                   >
                     Create Account
                   </Button>
@@ -51,7 +50,6 @@ const LandingPage = () => {
               </div>
             </div>
           </div>
-          {/* Decorative elements */}
           <div className="absolute top-0 left-0 w-64 h-64 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl"></div>
         </section>
