@@ -19,8 +19,8 @@ interface AuthContextType {
 
 // Dummy users for demonstration
 const DUMMY_USERS = [
-  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" },
-  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" },
+  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" as const },
+  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" as const },
 ];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Save user to local storage
       localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword);
+      setUser(userWithoutPassword as User);
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const { password: _, ...userWithoutPassword } = newUser;
       localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword);
+      setUser(userWithoutPassword as User);
     } catch (error) {
       console.error("Registration failed:", error);
       throw error;
