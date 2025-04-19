@@ -35,7 +35,7 @@ const LandingPage = () => {
                     onClick={() => navigate('/register')}
                     size="lg"
                     variant="outline"
-                    className="border-white text-white hover:bg-white/20 hover:text-white"
+                    className="border-white text-white hover:bg-white/20 hover:text-white hover:border-white/50"
                   >
                     Create Account
                   </Button>
