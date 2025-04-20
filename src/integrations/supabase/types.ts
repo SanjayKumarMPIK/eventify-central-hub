@@ -9,7 +9,142 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      event_registrations: {
+        Row: {
+          created_at: string | null
+          event_id: string | null
+          id: string
+          team_name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          team_name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          team_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          available_slots: number
+          created_at: string | null
+          created_by: string | null
+          date: string
+          department: string
+          description: string | null
+          id: string
+          image: string | null
+          location: string
+          title: string
+          total_slots: number
+          updated_at: string | null
+        }
+        Insert: {
+          available_slots?: number
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          department: string
+          description?: string | null
+          id?: string
+          image?: string | null
+          location: string
+          title: string
+          total_slots?: number
+          updated_at?: string | null
+        }
+        Update: {
+          available_slots?: number
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          department?: string
+          description?: string | null
+          id?: string
+          image?: string | null
+          location?: string
+          title?: string
+          total_slots?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          department: string | null
+          id: string
+          name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department?: string | null
+          id: string
+          name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          created_at: string | null
+          department: string
+          email: string | null
+          id: string
+          name: string
+          registration_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department: string
+          email?: string | null
+          id?: string
+          name: string
+          registration_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string
+          email?: string | null
+          id?: string
+          name?: string
+          registration_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
