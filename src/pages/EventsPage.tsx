@@ -101,7 +101,7 @@ const EventsPage = () => {
                       <div className="flex items-center">
                         <Users className="h-4 w-4 mr-1 text-gray-500" />
                         <span className="text-sm text-gray-600">
-                          {event.available_slots} / {event.total_slots} slots available
+                          {event.availableSlots} / {event.totalSlots} slots available
                         </span>
                       </div>
                       

@@ -1,6 +1,5 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 interface User {
   id: string;
@@ -18,6 +17,12 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
+// Dummy users for demonstration
+const DUMMY_USERS = [
+  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" as const },
+  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" as const },
+];
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -25,114 +30,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for user on initial load
-    const checkUser = async () => {
-      // Check if we have a session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // Get profile data
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name, department')
-          .eq('id', session.user.id)
-          .single();
-          
-        const userData: User = {
-          id: session.user.id,
-          email: session.user.email || '',
-          name: profile?.name || session.user.email?.split('@')[0] || '',
-          role: profile?.department === 'Administration' ? 'admin' : 'student'
-        };
-        
-        setUser(userData);
-        localStorage.setItem("eventify_user", JSON.stringify(userData));
-      }
-      
-      setLoading(false);
-    };
-    
-    checkUser();
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session) {
-          // Get profile data
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('name, department')
-            .eq('id', session.user.id)
-            .single();
-            
-          const userData: User = {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: profile?.name || session.user.email?.split('@')[0] || '',
-            role: profile?.department === 'Administration' ? 'admin' : 'student'
-          };
-          
-          setUser(userData);
-          localStorage.setItem("eventify_user", JSON.stringify(userData));
-        } else {
-          setUser(null);
-          localStorage.removeItem("eventify_user");
-        }
-      }
-    );
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Check for saved user in localStorage
+    const savedUser = localStorage.getItem("eventify_user");
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
   }, []);
 
   const login = async (email: string, password: string, role: "student" | "admin") => {
     setLoading(true);
     try {
-      const { data: { user }, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Simulate API call
+      const foundUser = DUMMY_USERS.find(
+        (u) => u.email === email && u.password === password && u.role === role
+      );
 
-      if (error) throw error;
+      if (!foundUser) {
+        throw new Error("Invalid credentials or user not found");
+      }
 
-      await supabase.from('user_logins').insert({
-        user_id: user?.id,
-        ip_address: '',
-        user_agent: navigator.userAgent,
-        success: true
-      });
-
-      // Fetch the profile data
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('name, department')
-        .eq('id', user?.id)
-        .single();
-
-      // Set the user data
-      const userData: User = {
-        id: user?.id || '',
-        email: user?.email || '',
-        name: profile?.name || email.split('@')[0],
-        role: role  // Use the role parameter passed to the login function
-      };
-
-      setUser(userData);
+      const { password: _, ...userWithoutPassword } = foundUser;
       
-      localStorage.setItem("eventify_user", JSON.stringify(userData));
+      // Save user to local storage
+      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
+      setUser(userWithoutPassword as User);
     } catch (error) {
       console.error("Login failed:", error);
-      
-      // Fix: Type guard to check if error is an object with a user property
-      if (error && typeof error === 'object' && 'user' in error && error.user && typeof error.user === 'object' && 'id' in error.user) {
-        await supabase.from('user_logins').insert({
-          user_id: error.user.id,
-          ip_address: '',
-          user_agent: navigator.userAgent,
-          success: false
-        });
-      }
       throw error;
     } finally {
       setLoading(false);
@@ -142,52 +66,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (name: string, email: string, password: string, role: "student" | "admin") => {
     setLoading(true);
     try {
-      // Register the user with Supabase with auto confirmation (no email verification required)
-      const { data: { user }, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: name,
-            role: role,
-          },
-          // This makes the user immediately confirmed without email verification
-          emailRedirectTo: window.location.origin
-        }
-      });
-
-      if (error) throw error;
-      
-      if (!user) throw new Error("No user returned from signUp");
-      
-      // Create a profile for the new user
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: user.id,
-        name: name,
-        department: role === 'admin' ? 'Administration' : 'Student'
-      });
-      
-      if (profileError) {
-        console.error("Error creating profile:", profileError);
-        throw profileError;
+      // Check if user already exists
+      if (DUMMY_USERS.some((u) => u.email === email)) {
+        throw new Error("User with this email already exists");
       }
-      
-      const userData: User = {
-        id: user.id || '',
-        email: email,
-        name: name,
-        role: role
-      };
-      
-      localStorage.setItem("eventify_user", JSON.stringify(userData));
-      setUser(userData);
 
-      // Also log them in automatically
-      await supabase.auth.signInWithPassword({
+      // In a real app, this would be a backend API call
+      const newUser = {
+        id: `${DUMMY_USERS.length + 1}`,
+        name,
         email,
         password,
-      });
+        role,
+      };
+
+      DUMMY_USERS.push(newUser);
       
+      const { password: _, ...userWithoutPassword } = newUser;
+      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
+      setUser(userWithoutPassword as User);
     } catch (error) {
       console.error("Registration failed:", error);
       throw error;
@@ -197,7 +94,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    supabase.auth.signOut();
     localStorage.removeItem("eventify_user");
     setUser(null);
   };

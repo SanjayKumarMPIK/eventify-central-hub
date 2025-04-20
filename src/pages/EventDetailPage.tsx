@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,20 +35,8 @@ const EventDetailPage = () => {
   ]);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [userRegistered, setUserRegistered] = useState<boolean | null>(null);
 
   const event = getEventById(id || '');
-  
-  useEffect(() => {
-    async function checkRegistration() {
-      if (user && event) {
-        const registered = await isUserRegisteredForEvent(user.id, event.id);
-        setUserRegistered(registered);
-      }
-    }
-    
-    checkRegistration();
-  }, [user, event, isUserRegisteredForEvent]);
 
   if (!event) {
     return (
@@ -66,7 +54,8 @@ const EventDetailPage = () => {
     );
   }
 
-  const canRegister = event.available_slots > 0 && !userRegistered;
+  const isRegistered = user ? isUserRegisteredForEvent(user.id, event.id) : false;
+  const canRegister = event.availableSlots > 0 && !isRegistered;
   
   const handleMemberChange = (index: number, field: string, value: string) => {
     const updatedMembers = [...teamMembers];
@@ -122,13 +111,12 @@ const EventDetailPage = () => {
     setIsRegistering(true);
     
     try {
-      await registerForEvent(event.id, teamName, teamMembers);
+      await registerForEvent(event.id, user.id, teamName, teamMembers);
       toast({
         title: "Registration successful",
         description: "You have successfully registered for this event!",
       });
       setIsDialogOpen(false);
-      setUserRegistered(true);
     } catch (error) {
       toast({
         title: "Registration failed",
@@ -200,8 +188,8 @@ const EventDetailPage = () => {
                     <div>
                       <p className="text-sm text-gray-500">Available Slots</p>
                       <p className="font-medium">
-                        {event.available_slots} of {event.total_slots}
-                        {event.available_slots === 0 && (
+                        {event.availableSlots} of {event.totalSlots}
+                        {event.availableSlots === 0 && (
                           <span className="text-red-500 ml-2 text-sm font-normal">(Full)</span>
                         )}
                       </p>
@@ -223,7 +211,7 @@ const EventDetailPage = () => {
                 <div className="bg-gray-50 p-6 rounded-lg border">
                   <h3 className="text-lg font-semibold mb-4">Registration</h3>
                   
-                  {userRegistered ? (
+                  {isRegistered ? (
                     <div className="text-center py-4">
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-3">
                         <Users className="h-8 w-8 text-green-600" />

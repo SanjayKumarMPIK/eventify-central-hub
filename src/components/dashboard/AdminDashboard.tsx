@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useEvents } from '@/contexts/EventsContext';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ const AdminDashboard = () => {
     date: '',
     time: '',
     location: '',
-    total_slots: 20,
+    totalSlots: 20,
     department: '',
     image: 'https://images.unsplash.com/photo-1523580494863-6f3031224c94',
   });
@@ -83,8 +84,8 @@ const AdminDashboard = () => {
         description: newEvent.description,
         date: dateTimeString,
         location: newEvent.location,
-        total_slots: Number(newEvent.total_slots),
-        available_slots: Number(newEvent.total_slots),
+        totalSlots: Number(newEvent.totalSlots),
+        availableSlots: Number(newEvent.totalSlots),
         department: newEvent.department,
         image: newEvent.image,
       });
@@ -96,7 +97,7 @@ const AdminDashboard = () => {
         date: '',
         time: '',
         location: '',
-        total_slots: 20,
+        totalSlots: 20,
         department: '',
         image: 'https://images.unsplash.com/photo-1523580494863-6f3031224c94',
       });
@@ -235,13 +236,13 @@ const AdminDashboard = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="total_slots">Total Slots</Label>
+                  <Label htmlFor="totalSlots">Total Slots</Label>
                   <Input
-                    id="total_slots"
-                    name="total_slots"
+                    id="totalSlots"
+                    name="totalSlots"
                     type="number"
                     min="1"
-                    value={newEvent.total_slots}
+                    value={newEvent.totalSlots}
                     onChange={handleNewEventChange}
                   />
                 </div>
@@ -359,7 +360,7 @@ const AdminDashboard = () => {
                       </div>
                       <div className="flex items-center">
                         <Users className="h-4 w-4 mr-2 text-gray-500" />
-                        <span>{event.available_slots} / {event.total_slots} slots available</span>
+                        <span>{event.availableSlots} / {event.totalSlots} slots available</span>
                       </div>
                     </div>
                   </CardContent>

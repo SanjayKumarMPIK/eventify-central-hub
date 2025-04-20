@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,44 +31,23 @@ const StudentDashboard = () => {
 
   const [previewEvent, setPreviewEvent] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<'certificate' | 'duty'>('certificate');
-  const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   
   // Get user registrations
-  useEffect(() => {
-    async function fetchUserRegistrations() {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        const userRegistrations = await getUserRegistrations(user.id);
-        
-        // Map registrations to events
-        const regEvents = userRegistrations.map(reg => {
-          const event = events.find(e => e.id === reg.event_id);
-          if (!event) return null;
-          
-          return {
-            ...event,
-            registrationId: reg.id,
-            created_at: reg.created_at,
-            team_name: reg.team_name,
-            teamMembers: reg.teamMembers,
-          };
-        }).filter(Boolean);
-        
-        setRegisteredEvents(regEvents);
-      } catch (error) {
-        console.error('Error fetching registrations:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const userRegistrations = user ? getUserRegistrations(user.id) : [];
+  
+  // Get registered events details
+  const registeredEvents = userRegistrations.map(reg => {
+    const event = events.find(e => e.id === reg.eventId);
+    if (!event) return null;
     
-    fetchUserRegistrations();
-  }, [user, events, getUserRegistrations]);
+    return {
+      ...event,
+      registrationId: reg.id,
+      registrationDate: reg.registrationDate,
+      teamName: reg.teamName,
+      teamMembers: reg.teamMembers,
+    };
+  }).filter(Boolean);
 
   const handlePreviewCertificate = (eventId: string) => {
     setPreviewEvent(eventId);
@@ -83,14 +62,6 @@ const StudentDashboard = () => {
   const closePreview = () => {
     setPreviewEvent(null);
   };
-
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <h3 className="text-xl font-medium">Loading your events...</h3>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -127,7 +98,7 @@ const StudentDashboard = () => {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg">{event.title}</CardTitle>
                     <CardDescription>
-                      Team: {event.team_name}
+                      Team: {event.teamName}
                     </CardDescription>
                   </CardHeader>
                   
