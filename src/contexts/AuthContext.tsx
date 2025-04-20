@@ -1,5 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface User {
   id: string;
@@ -17,12 +17,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
-// Dummy users for demonstration
-const DUMMY_USERS = [
-  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" as const },
-  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" as const },
-];
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -30,7 +24,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for saved user in localStorage
     const savedUser = localStorage.getItem("eventify_user");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
@@ -41,22 +34,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string, role: "student" | "admin") => {
     setLoading(true);
     try {
-      // Simulate API call
-      const foundUser = DUMMY_USERS.find(
-        (u) => u.email === email && u.password === password && u.role === role
-      );
+      const { data: { user }, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (!foundUser) {
-        throw new Error("Invalid credentials or user not found");
+      if (error) throw error;
+
+      await supabase.from('user_logins').insert({
+        user_id: user?.id,
+        ip_address: '',
+        user_agent: navigator.userAgent,
+        success: true
+      });
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('name, role')
+        .eq('id', user?.id)
+        .single();
+
+      if (profile?.role !== role) {
+        throw new Error("Invalid role for this user");
       }
 
-      const { password: _, ...userWithoutPassword } = foundUser;
+      setUser({
+        id: user.id,
+        email: user.email!,
+        name: profile.name || '',
+        role: role
+      });
       
-      // Save user to local storage
-      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword as User);
+      localStorage.setItem("eventify_user", JSON.stringify({
+        id: user.id,
+        email: user.email,
+        name: profile.name,
+        role: role
+      }));
     } catch (error) {
       console.error("Login failed:", error);
+      if (error?.user?.id) {
+        await supabase.from('user_logins').insert({
+          user_id: error.user.id,
+          ip_address: '',
+          user_agent: navigator.userAgent,
+          success: false
+        });
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -66,12 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (name: string, email: string, password: string, role: "student" | "admin") => {
     setLoading(true);
     try {
-      // Check if user already exists
       if (DUMMY_USERS.some((u) => u.email === email)) {
         throw new Error("User with this email already exists");
       }
 
-      // In a real app, this would be a backend API call
       const newUser = {
         id: `${DUMMY_USERS.length + 1}`,
         name,
