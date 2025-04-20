@@ -81,7 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("eventify_user", JSON.stringify(userData));
     } catch (error) {
       console.error("Login failed:", error);
-      if (error instanceof Error && 'user' in error && error.user?.id) {
+      
+      // Fix: Type guard to check if error is an object with a user property
+      if (error && typeof error === 'object' && 'user' in error && error.user && typeof error.user === 'object' && 'id' in error.user) {
         await supabase.from('user_logins').insert({
           user_id: error.user.id,
           ip_address: '',
