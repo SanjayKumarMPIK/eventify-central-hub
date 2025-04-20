@@ -28,15 +28,27 @@ interface EventRegistrationsProps {
 const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrationsProps) => {
   const { events, getRegistrationsByEventId } = useEvents();
   const [registrations, setRegistrations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   
   useEffect(() => {
-    if (selectedEvent) {
-      const eventRegistrations = getRegistrationsByEventId(selectedEvent);
-      setRegistrations(eventRegistrations);
-    } else if (events.length > 0) {
-      // If no event is selected, show the first event's registrations
-      setSelectedEvent(events[0].id);
+    async function fetchRegistrations() {
+      if (selectedEvent) {
+        setLoading(true);
+        try {
+          const eventRegistrations = await getRegistrationsByEventId(selectedEvent);
+          setRegistrations(eventRegistrations);
+        } catch (error) {
+          console.error("Error fetching registrations:", error);
+        } finally {
+          setLoading(false);
+        }
+      } else if (events.length > 0) {
+        // If no event is selected, show the first event's registrations
+        setSelectedEvent(events[0].id);
+      }
     }
+    
+    fetchRegistrations();
   }, [selectedEvent, events, getRegistrationsByEventId, setSelectedEvent]);
 
   if (events.length === 0) {
@@ -97,13 +109,17 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
             </div>
             <div>
               <span className="text-gray-500">Available Slots:</span>{' '}
-              {selectedEventObj.availableSlots} of {selectedEventObj.totalSlots}
+              {selectedEventObj.available_slots} of {selectedEventObj.total_slots}
             </div>
           </div>
         </div>
       )}
       
-      {registrations.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-12 border rounded-lg">
+          <h3 className="text-lg font-medium text-gray-600">Loading registrations...</h3>
+        </div>
+      ) : registrations.length === 0 ? (
         <div className="text-center py-12 border rounded-lg">
           <h3 className="text-lg font-medium text-gray-600">No registrations yet</h3>
           <p className="text-gray-500 mt-2">
@@ -125,11 +141,11 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
             <TableBody>
               {registrations.map((reg) => (
                 <TableRow key={reg.id}>
-                  <TableCell className="font-medium">{reg.teamName}</TableCell>
+                  <TableCell className="font-medium">{reg.team_name}</TableCell>
                   <TableCell>
-                    {format(new Date(reg.registrationDate), 'MMM dd, yyyy')}
+                    {format(new Date(reg.created_at), 'MMM dd, yyyy')}
                   </TableCell>
-                  <TableCell>{reg.teamMembers.length} members</TableCell>
+                  <TableCell>{reg.teamMembers?.length || 0} members</TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm">
                       View Details
