@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +41,15 @@ const RegisterPage = () => {
       return;
     }
     
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -52,9 +60,19 @@ const RegisterPage = () => {
       });
       navigate('/dashboard');
     } catch (error) {
+      let errorMessage = "Registration failed";
+      
+      if (error instanceof Error) {
+        if (error.message.includes("email address is already registered")) {
+          errorMessage = "This email is already registered. Please login instead.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
