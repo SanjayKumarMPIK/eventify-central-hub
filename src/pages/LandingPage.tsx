@@ -11,7 +11,6 @@ const LandingPage = () => {
     <>
       <Navbar />
       <main className="min-h-screen bg-eventify-light">
-        {/* Hero Section */}
         <section className="relative bg-gradient-to-r from-eventify-purple to-eventify-blue py-20 overflow-hidden">
           <div className="container mx-auto px-4 relative z-10">
             <div className="grid md:grid-cols-2 gap-8 items-center">
@@ -35,7 +34,7 @@ const LandingPage = () => {
                     onClick={() => navigate('/register')}
                     size="lg"
                     variant="outline"
-                    className="border-white text-white hover:bg-white/20 hover:text-white/90 hover:border-white/50"
+                    className="border-white text-eventify-purple hover:bg-white/10 hover:opacity-90"
                   >
                     Create Account
                   </Button>
@@ -54,7 +53,6 @@ const LandingPage = () => {
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl"></div>
         </section>
 
-        {/* Features Section */}
         <section className="py-16 px-4">
           <div className="container mx-auto">
             <h2 className="text-3xl font-bold text-center mb-12">Simplify Your Event Experience</h2>
@@ -93,7 +91,6 @@ const LandingPage = () => {
           </div>
         </section>
 
-        {/* Call to Action */}
         <section className="py-16 px-4 bg-white">
           <div className="container mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
@@ -107,7 +104,6 @@ const LandingPage = () => {
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between">
