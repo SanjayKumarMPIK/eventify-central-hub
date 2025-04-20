@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -48,32 +49,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         success: true
       });
 
-      const { data: profile } = await supabase
+      // Fetch the profile data
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('name, role')
+        .select('name, department')
         .eq('id', user?.id)
         .single();
 
-      if (profile?.role !== role) {
-        throw new Error("Invalid role for this user");
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        // Create a profile if it doesn't exist
+        await supabase
+          .from('profiles')
+          .insert({
+            id: user?.id,
+            name: email.split('@')[0],  // Default name
+            department: role === 'admin' ? 'Administration' : 'Student'
+          });
       }
 
-      setUser({
-        id: user.id,
-        email: user.email!,
-        name: profile.name || '',
-        role: role
-      });
+      // Set the user data
+      const userData: User = {
+        id: user?.id || '',
+        email: user?.email || '',
+        name: profile?.name || email.split('@')[0],
+        role: role  // Use the role parameter passed to the login function
+      };
+
+      setUser(userData);
       
-      localStorage.setItem("eventify_user", JSON.stringify({
-        id: user.id,
-        email: user.email,
-        name: profile.name,
-        role: role
-      }));
+      localStorage.setItem("eventify_user", JSON.stringify(userData));
     } catch (error) {
       console.error("Login failed:", error);
-      if (error?.user?.id) {
+      if (error instanceof Error && 'user' in error && error.user?.id) {
         await supabase.from('user_logins').insert({
           user_id: error.user.id,
           ip_address: '',
@@ -90,23 +98,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (name: string, email: string, password: string, role: "student" | "admin") => {
     setLoading(true);
     try {
-      if (DUMMY_USERS.some((u) => u.email === email)) {
-        throw new Error("User with this email already exists");
-      }
-
-      const newUser = {
-        id: `${DUMMY_USERS.length + 1}`,
-        name,
+      // Register the user with Supabase
+      const { data: { user }, error } = await supabase.auth.signUp({
         email,
         password,
-        role,
-      };
+      });
 
-      DUMMY_USERS.push(newUser);
+      if (error) throw error;
       
-      const { password: _, ...userWithoutPassword } = newUser;
-      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword as User);
+      // Create a profile for the new user
+      await supabase.from('profiles').insert({
+        id: user?.id,
+        name: name,
+        department: role === 'admin' ? 'Administration' : 'Student'
+      });
+      
+      const userData: User = {
+        id: user?.id || '',
+        email: email,
+        name: name,
+        role: role
+      };
+      
+      localStorage.setItem("eventify_user", JSON.stringify(userData));
+      setUser(userData);
     } catch (error) {
       console.error("Registration failed:", error);
       throw error;
@@ -116,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    supabase.auth.signOut();
     localStorage.removeItem("eventify_user");
     setUser(null);
   };
