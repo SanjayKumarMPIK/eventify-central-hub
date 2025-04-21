@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -110,25 +109,25 @@ const AboutPage = () => {
             <div className="grid md:grid-cols-4 gap-6">
               <div className="text-center">
                 <div className="w-32 h-32 bg-gray-200 rounded-full mx-auto mb-4"></div>
-                <h3 className="font-semibold">Sarah Johnson</h3>
+                <h3 className="font-semibold">Sanjay Kumar MP</h3>
                 <p className="text-gray-600 text-sm">Founder & CEO</p>
               </div>
               
               <div className="text-center">
                 <div className="w-32 h-32 bg-gray-200 rounded-full mx-auto mb-4"></div>
-                <h3 className="font-semibold">Michael Chen</h3>
+                <h3 className="font-semibold">Sanjay Kumar MP</h3>
                 <p className="text-gray-600 text-sm">Lead Developer</p>
               </div>
               
               <div className="text-center">
                 <div className="w-32 h-32 bg-gray-200 rounded-full mx-auto mb-4"></div>
-                <h3 className="font-semibold">Aisha Patel</h3>
+                <h3 className="font-semibold">Siddharthaa S & Yogeeshwar P</h3>
                 <p className="text-gray-600 text-sm">UX Designer</p>
               </div>
               
               <div className="text-center">
                 <div className="w-32 h-32 bg-gray-200 rounded-full mx-auto mb-4"></div>
-                <h3 className="font-semibold">James Wilson</h3>
+                <h3 className="font-semibold">Sruthi K</h3>
                 <p className="text-gray-600 text-sm">Education Specialist</p>
               </div>
             </div>
