@@ -12,16 +12,13 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string, role: "student" | "admin") => Promise<void>;
-  register: (name: string, email: string, password: string, role: "student" | "admin") => Promise<void>;
+  register: (name: string, email: string, password: string, role: "student" | "admin", adminCode?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
 
-// Dummy users for demonstration
-const DUMMY_USERS = [
-  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" as const },
-  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" as const },
-];
+// Admin code for registering as an admin
+const ADMIN_REGISTRATION_CODE = "ADMIN123";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -63,9 +60,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string, role: "student" | "admin") => {
+  const register = async (name: string, email: string, password: string, role: "student" | "admin", adminCode?: string) => {
     setLoading(true);
     try {
+      // Check if trying to register as admin
+      if (role === "admin") {
+        // Verify admin code
+        if (!adminCode || adminCode !== ADMIN_REGISTRATION_CODE) {
+          throw new Error("Invalid admin registration code");
+        }
+      }
+
       // Check if user already exists
       if (DUMMY_USERS.some((u) => u.email === email)) {
         throw new Error("User with this email already exists");
@@ -121,3 +126,9 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// Dummy users for demonstration
+const DUMMY_USERS = [
+  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" as const },
+  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" as const },
+];

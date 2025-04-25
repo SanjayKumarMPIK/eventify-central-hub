@@ -15,6 +15,7 @@ const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'student' | 'admin'>('student');
+  const [adminCode, setAdminCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const { register } = useAuth();
@@ -42,10 +43,20 @@ const RegisterPage = () => {
       return;
     }
     
+    // Additional validation for admin registration
+    if (role === 'admin' && !adminCode) {
+      toast({
+        title: "Error",
+        description: "Admin code is required for admin registration",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
-      await register(name, email, password, role);
+      await register(name, email, password, role, adminCode);
       toast({
         title: "Success",
         description: "Account created successfully",
@@ -108,7 +119,7 @@ const RegisterPage = () => {
               
               <TabsContent value="admin">
                 <p className="text-sm text-muted-foreground mt-2">
-                  Register as an admin to create and manage events.
+                  Register as an admin to create and manage events. Admin registration requires an authorization code.
                 </p>
               </TabsContent>
             </Tabs>
@@ -159,6 +170,20 @@ const RegisterPage = () => {
                   required
                 />
               </div>
+              
+              {role === 'admin' && (
+                <div className="space-y-2">
+                  <Label htmlFor="adminCode">Admin Authorization Code</Label>
+                  <Input
+                    id="adminCode"
+                    type="text"
+                    placeholder="Enter admin code"
+                    value={adminCode}
+                    onChange={(e) => setAdminCode(e.target.value)}
+                    required={role === 'admin'}
+                  />
+                </div>
+              )}
               
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Creating Account..." : "Create Account"}
