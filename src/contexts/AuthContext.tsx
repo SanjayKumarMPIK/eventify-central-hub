@@ -5,8 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 
+// Define our own extended User type with the metadata fields we need
+interface UserWithMeta extends User {
+  name?: string;
+  role?: 'student' | 'admin';
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: UserWithMeta | null;
   session: Session | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -21,18 +27,34 @@ const ADMIN_REGISTRATION_CODE = "ADMIN123";
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserWithMeta | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Helper function to process user data
+  const processUserData = (session: Session | null) => {
+    if (!session?.user) {
+      setUser(null);
+      return;
+    }
+
+    const userData = session.user as UserWithMeta;
+    
+    // Get the user's metadata from user_metadata
+    userData.name = session.user.user_metadata?.name;
+    userData.role = session.user.user_metadata?.role;
+    
+    setUser(userData);
+  };
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         setSession(currentSession);
-        setUser(currentSession?.user ?? null);
+        processUserData(currentSession);
         
         if (event === 'SIGNED_IN') {
           toast({
@@ -52,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
-      setUser(currentSession?.user ?? null);
+      processUserData(currentSession);
       setLoading(false);
     });
 
