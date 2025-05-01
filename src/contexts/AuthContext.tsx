@@ -1,6 +1,5 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
@@ -31,7 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const navigate = useNavigate();
+  
+  // Remove the useNavigate hook from here
 
   // Helper function to process user data
   const processUserData = (session: Session | null) => {
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             title: "Signed out",
             description: "You have been signed out",
           });
-          navigate('/');
+          // Remove the navigate call from here
         }
       }
     );
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, toast]);
+  }, [toast]); // Keep only toast in the dependency array
 
   const login = async (email: string, password: string) => {
     setLoading(true);
