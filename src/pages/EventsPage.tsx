@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
 import { Button } from '@/components/ui/button';
@@ -8,16 +8,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar, Search, MapPin, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import Navbar from '@/components/Navbar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const EventsPage = () => {
-  const { events } = useEvents();
+  const { events, loading, fetchEvents } = useEvents();
   const navigate = useNavigate();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   
+  // Refresh events when the page loads
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+  
   // Extract unique departments for filtering
-  const departments = ['all', ...new Set(events.map(event => event.department))];
+  const departments = ['all', ...Array.from(new Set(events.map(event => event.department)))];
   
   // Filter events based on search term and department
   const filteredEvents = events.filter(event => {
@@ -28,6 +34,47 @@ const EventsPage = () => {
     
     return matchesSearch && matchesDepartment;
   });
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-eventify-light py-8">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+              <Skeleton className="h-10 w-48" />
+              <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                <Skeleton className="h-10 w-64" />
+                <Skeleton className="h-10 w-48" />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                  <Skeleton className="h-48 w-full" />
+                  <div className="p-5 flex-1 flex flex-col">
+                    <Skeleton className="h-6 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-full mb-3" />
+                    <Skeleton className="h-4 w-2/3 mb-3" />
+                    <Skeleton className="h-4 w-full mb-4 flex-1" />
+                    <div className="flex justify-between pt-2 border-t mt-auto">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-4 w-1/4" />
+                    </div>
+                  </div>
+                  <div className="px-5 pb-5">
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
@@ -101,7 +148,7 @@ const EventsPage = () => {
                       <div className="flex items-center">
                         <Users className="h-4 w-4 mr-1 text-gray-500" />
                         <span className="text-sm text-gray-600">
-                          {event.availableSlots} / {event.totalSlots} slots available
+                          {event.available_slots} / {event.total_slots} slots available
                         </span>
                       </div>
                       

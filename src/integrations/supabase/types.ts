@@ -9,6 +9,80 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      event_registrations: {
+        Row: {
+          event_id: string
+          id: string
+          registration_date: string
+          team_name: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          registration_date?: string
+          team_name: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          registration_date?: string
+          team_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          available_slots: number
+          created_at: string
+          date: string
+          department: string
+          description: string
+          id: string
+          image: string
+          location: string
+          title: string
+          total_slots: number
+          updated_at: string
+        }
+        Insert: {
+          available_slots: number
+          created_at?: string
+          date: string
+          department: string
+          description: string
+          id?: string
+          image: string
+          location: string
+          title: string
+          total_slots: number
+          updated_at?: string
+        }
+        Update: {
+          available_slots?: number
+          created_at?: string
+          date?: string
+          department?: string
+          description?: string
+          id?: string
+          image?: string
+          location?: string
+          title?: string
+          total_slots?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -33,12 +107,47 @@ export type Database = {
         }
         Relationships: []
       }
+      team_members: {
+        Row: {
+          department: string
+          email: string | null
+          id: string
+          name: string
+          registration_id: string
+        }
+        Insert: {
+          department: string
+          email?: string | null
+          id?: string
+          name: string
+          registration_id: string
+        }
+        Update: {
+          department?: string
+          email?: string | null
+          id?: string
+          name?: string
+          registration_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
