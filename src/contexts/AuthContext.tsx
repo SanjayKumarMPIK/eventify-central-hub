@@ -1,19 +1,17 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: "student" | "admin";
-}
+import { useNavigate } from 'react-router-dom';
+import { supabase } from "@/integrations/supabase/client";
+import { Session, User } from "@supabase/supabase-js";
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   loading: boolean;
-  login: (email: string, password: string, role: "student" | "admin") => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: "student" | "admin", adminCode?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -24,34 +22,56 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for saved user in localStorage
-    const savedUser = localStorage.getItem("eventify_user");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
-  }, []);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        if (event === 'SIGNED_IN') {
+          toast({
+            title: "Signed in",
+            description: "You have successfully signed in",
+          });
+        } else if (event === 'SIGNED_OUT') {
+          toast({
+            title: "Signed out",
+            description: "You have been signed out",
+          });
+          navigate('/');
+        }
+      }
+    );
 
-  const login = async (email: string, password: string, role: "student" | "admin") => {
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate, toast]);
+
+  const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      // Simulate API call
-      const foundUser = DUMMY_USERS.find(
-        (u) => u.email === email && u.password === password && u.role === role
-      );
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-      if (!foundUser) {
-        throw new Error("Invalid credentials or user not found");
+      if (error) {
+        throw error;
       }
-
-      const { password: _, ...userWithoutPassword } = foundUser;
-      
-      // Save user to local storage
-      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword as User);
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
@@ -71,25 +91,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Check if user already exists
-      if (DUMMY_USERS.some((u) => u.email === email)) {
-        throw new Error("User with this email already exists");
-      }
-
-      // In a real app, this would be a backend API call
-      const newUser = {
-        id: `${DUMMY_USERS.length + 1}`,
-        name,
+      const { error } = await supabase.auth.signUp({
         email,
         password,
-        role,
-      };
+        options: {
+          data: {
+            name,
+            role
+          }
+        }
+      });
 
-      DUMMY_USERS.push(newUser);
-      
-      const { password: _, ...userWithoutPassword } = newUser;
-      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword as User);
+      if (error) {
+        throw error;
+      }
     } catch (error) {
       console.error("Registration failed:", error);
       throw error;
@@ -98,15 +113,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("eventify_user");
-    setUser(null);
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        session,
         login,
         register,
         logout,
@@ -126,9 +153,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-// Dummy users for demonstration
-const DUMMY_USERS = [
-  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" as const },
-  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" as const },
-];

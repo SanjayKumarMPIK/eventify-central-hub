@@ -8,12 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ExclamationTriangleIcon } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'admin'>('student');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -21,6 +23,7 @@ const LoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (!email || !password) {
       toast({
@@ -34,18 +37,15 @@ const LoginPage = () => {
     setIsLoading(true);
     
     try {
-      await login(email, password, role);
-      toast({
-        title: "Success",
-        description: "Logged in successfully",
-      });
+      await login(email, password);
       navigate('/dashboard');
     } catch (error) {
-      toast({
-        title: "Login Failed",
-        description: "Invalid credentials or account not found",
-        variant: "destructive",
-      });
+      console.error('Login error:', error);
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : "Failed to login. Please check your credentials and try again."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -73,34 +73,12 @@ const LoginPage = () => {
           </CardHeader>
           
           <CardContent>
-            <Tabs defaultValue="student" className="w-full mb-6">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger 
-                  value="student" 
-                  onClick={() => setRole('student')}
-                >
-                  Student
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="admin" 
-                  onClick={() => setRole('admin')}
-                >
-                  Admin
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="student">
-                <p className="text-sm text-muted-foreground mt-2">
-                  Login as a student to register for events and access your certificates.
-                </p>
-              </TabsContent>
-              
-              <TabsContent value="admin">
-                <p className="text-sm text-muted-foreground mt-2">
-                  Login as an admin to manage events and review registrations.
-                </p>
-              </TabsContent>
-            </Tabs>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <ExclamationTriangleIcon className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -146,14 +124,6 @@ const LoginPage = () => {
             </p>
           </CardFooter>
         </Card>
-        
-        <div className="mt-4 text-center text-xs text-gray-500">
-          {role === 'student' ? (
-            <p>Demo login: student@eventify.com / student123</p>
-          ) : (
-            <p>Demo login: admin@eventify.com / admin123</p>
-          )}
-        </div>
       </div>
     </div>
   );
