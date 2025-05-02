@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Get the user's metadata from the profile table
       userData.name = profileData.name;
-      userData.role = profileData.role;
+      userData.role = profileData.role as 'student' | 'admin';
       
       setUser(userData);
     } catch (error) {

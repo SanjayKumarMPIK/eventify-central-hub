@@ -126,7 +126,7 @@ const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
       )}
       
       <div className="absolute top-4 right-4 opacity-30 text-xs">
-        ID: {registration.registrationId}
+        ID: {registration.id}
       </div>
     </div>
   );
