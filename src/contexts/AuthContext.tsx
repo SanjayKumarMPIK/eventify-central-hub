@@ -2,15 +2,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast";
+import { User, getCurrentSession, getCurrentUser, registerUser, loginUser, logoutUser } from '@/services/authService';
 
-// Define the types for user and auth context
-interface User {
-  id: string;
-  name: string;
-  role: 'student' | 'admin';
-}
-
+// Define the auth context type
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -34,30 +29,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      
-      if (data.session) {
-        setIsAuthenticated(true);
-        await getUserProfile(data.session.user.id);
-      } else {
+      try {
+        setLoading(true);
+        const session = await getCurrentSession();
+        
+        if (session) {
+          setIsAuthenticated(true);
+          await getUserProfile(session.user.id);
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error getting initial session:", error);
         setIsAuthenticated(false);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     getInitialSession();
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session) {
-        setIsAuthenticated(true);
-        await getUserProfile(session.user.id);
-      } else {
-        setIsAuthenticated(false);
-        setUser(null);
+      console.log("Auth state changed:", _event, session?.user?.id);
+      setLoading(true);
+      try {
+        if (session) {
+          setIsAuthenticated(true);
+          await getUserProfile(session.user.id);
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error handling auth state change:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
@@ -68,26 +78,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to get user profile
   const getUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (error) throw error;
-      if (!data) throw new Error("Profile not found");
-
-      // Update user state with profile data
-      setUser({
-        id: userId,
-        name: data.name,
-        role: data.role as "student" | "admin" // Add type assertion to fix the error
-      });
+      const userData = await getCurrentUser(userId);
+      setUser(userData);
+      if (!userData) {
+        console.error("Profile not found, logging out");
+        await logout();
+      }
     } catch (error) {
       console.error("Error fetching user profile:", error);
       // If profile not found, log out the user
       await logout();
-      setUser(null);
     }
   };
 
@@ -95,53 +95,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (name: string, email: string, password: string, role: 'student' | 'admin') => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-          data: {
-            name: name,
-            role: role,
-          },
-        },
-      });
-
-      if (error) {
-        throw error;
+      const { user: authUser } = await registerUser(name, email, password, role);
+      if (authUser) {
+        setIsAuthenticated(true);
+        setUser({ id: authUser.id, name, role });
+        navigate('/dashboard');
       }
-
-      // Create user profile in 'profiles' table
-      if (data.user?.id) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              name: name,
-              role: role,
-              email: email,
-            },
-          ]);
-
-        if (profileError) {
-          throw profileError;
-        }
-      }
-
-      setIsAuthenticated(true);
-      setUser({ id: data.user!.id, name: name, role: role });
-      toast({
-        title: "Success",
-        description: "Registration successful",
-      });
-      navigate('/dashboard');
-    } catch (error: any) {
-      console.error("Registration error:", error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Registration failed",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -151,58 +110,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      setIsAuthenticated(true);
-      await getUserProfile(data.user!.id);
-      toast({
-        title: "Success",
-        description: "Login successful",
-      });
+      await loginUser(email, password);
       navigate('/dashboard');
-    } catch (error: any) {
-      console.error("Login error:", error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Login failed",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout function
+  // Logout function - Fixed to ensure proper state cleanup
   const logout = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        throw error;
-      }
-
+      await logoutUser();
+      // Important: Clear user state AFTER successful logout
       setIsAuthenticated(false);
       setUser(null);
-      toast({
-        title: "Success",
-        description: "Logout successful",
-      });
-      navigate('/');
-    } catch (error: any) {
-      console.error("Logout error:", error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Logout failed",
-        variant: "destructive",
-      });
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error("Logout error in context:", error);
     } finally {
       setLoading(false);
     }
