@@ -1,36 +1,10 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-// Define types
-export interface Event {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  location: string;
-  total_slots: number;
-  available_slots: number;
-  image: string;
-  department: string;
-}
-
-export interface TeamMember {
-  name: string;
-  department: string;
-  email?: string;
-}
-
-export interface EventRegistration {
-  id: string;
-  eventId: string;
-  userId: string;
-  teamName: string;
-  teamMembers: TeamMember[];
-  registrationDate: string;
-}
+import { Event, EventRegistration, TeamMember } from '@/types/event.types';
+import * as eventService from '@/services/eventService';
+import * as registrationService from '@/services/registrationService';
 
 interface EventContextType {
   events: Event[];
@@ -58,25 +32,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("events").select("*");
-
-      if (error) {
-        throw error;
-      }
-
-      // Map the data to our Event type
-      const eventsData: Event[] = data.map((event: any) => ({
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        date: event.date,
-        location: event.location,
-        department: event.department,
-        image: event.image,
-        total_slots: event.total_slots,
-        available_slots: event.available_slots,
-      }));
-
+      const eventsData = await eventService.fetchEvents();
       setEvents(eventsData);
     } catch (error: any) {
       console.error("Error fetching events:", error);
@@ -99,31 +55,10 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const addEvent = async (event: Omit<Event, "id">) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("events")
-        .insert([
-          {
-            title: event.title,
-            description: event.description,
-            date: event.date,
-            location: event.location,
-            total_slots: event.total_slots,
-            available_slots: event.total_slots,
-            image: event.image,
-            department: event.department,
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
+      const newEvent = await eventService.addEvent(event);
+      if (newEvent) {
+        setEvents((prevEvents) => [...prevEvents, newEvent]);
       }
-
-      setEvents((prevEvents) => [...prevEvents, data]);
-      
-      // Return void to match the function signature
-      return;
     } catch (error: any) {
       console.error("Error adding event:", error);
       toast({
@@ -140,17 +75,14 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const deleteEvent = async (id: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("events").delete().eq("id", id);
-
-      if (error) {
-        throw error;
+      const success = await eventService.deleteEvent(id);
+      if (success) {
+        setEvents(events.filter(event => event.id !== id));
+        toast({
+          title: "Success",
+          description: "Event deleted successfully",
+        });
       }
-
-      setEvents(events.filter(event => event.id !== id));
-      toast({
-        title: "Success",
-        description: "Event deleted successfully",
-      });
     } catch (error: any) {
       console.error("Error deleting event:", error);
       toast({
@@ -167,39 +99,14 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const increaseEventSlots = async (id: string, additionalSlots: number) => {
     setLoading(true);
     try {
-      // Get the current event
-      const event = events.find(e => e.id === id);
-      if (!event) throw new Error("Event not found");
-
-      const newTotalSlots = event.total_slots + additionalSlots;
-
-      const { error } = await supabase
-        .from("events")
-        .update({ 
-          total_slots: newTotalSlots,
-          available_slots: event.available_slots + additionalSlots 
-        })
-        .eq("id", id);
-
-      if (error) {
-        throw error;
+      const updatedEvent = await eventService.increaseEventSlots(id, additionalSlots);
+      if (updatedEvent) {
+        setEvents(events.map(e => e.id === id ? updatedEvent : e));
+        toast({
+          title: "Success",
+          description: `Added ${additionalSlots} slots to the event`,
+        });
       }
-
-      // Update local state
-      setEvents(events.map(e => 
-        e.id === id 
-          ? { 
-              ...e, 
-              total_slots: newTotalSlots,
-              available_slots: e.available_slots + additionalSlots 
-            } 
-          : e
-      ));
-
-      toast({
-        title: "Success",
-        description: `Added ${additionalSlots} slots to the event`,
-      });
     } catch (error: any) {
       console.error("Error increasing event slots:", error);
       toast({
@@ -221,55 +128,26 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setLoading(true);
     try {
-      // Insert registration
-      const { data: registrationData, error: registrationError } =
-        await supabase
-          .from("event_registrations")
-          .insert([{ event_id: eventId, user_id: userId, team_name: teamName }])
-          .select()
-          .single();
+      const success = await registrationService.registerForEvent(eventId, userId, teamName, teamMembers);
+      if (success) {
+        // Update events state with reduced available slots
+        setEvents((prevEvents) =>
+          prevEvents.map((event) =>
+            event.id === eventId
+              ? { ...event, available_slots: event.available_slots - 1 }
+              : event
+          )
+        );
 
-      if (registrationError) {
-        throw registrationError;
+        toast({
+          title: "Success",
+          description: "Registration successful",
+        });
+
+        if (user) {
+          await getUserRegistrations(user.id);
+        }
       }
-
-      // Insert team members with registration ID
-      const teamMembersToInsert = teamMembers.map((member) => ({
-        registration_id: registrationData.id,
-        name: member.name,
-        department: member.department,
-        email: member.email,
-      }));
-
-      const { error: teamMembersError } = await supabase
-        .from("team_members")
-        .insert(teamMembersToInsert);
-
-      if (teamMembersError) {
-        throw teamMembersError;
-      }
-
-      // Update events state with reduced available slots
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === eventId
-            ? { ...event, available_slots: event.available_slots - 1 }
-            : event
-        )
-      );
-
-      toast({
-        title: "Success",
-        description: "Registration successful",
-      });
-
-      // Fixed: Changed fetchUserRegistrations to getUserRegistrations
-      if (user) {
-        await getUserRegistrations(user.id);
-      }
-      
-      // Return void to match the function signature
-      return;
     } catch (error: any) {
       console.error("Error registering for event:", error);
       toast({
@@ -284,132 +162,17 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   // Function to check if a user is registered for an event
   const isUserRegisteredForEvent = async (userId: string, eventId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("event_registrations")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("event_id", eventId);
-
-      if (error) {
-        throw error;
-      }
-
-      return data && data.length > 0;
-    } catch (error: any) {
-      console.error("Error checking registration:", error);
-      return false;
-    }
+    return registrationService.isUserRegisteredForEvent(userId, eventId);
   };
 
   // Function to get user registrations
   const getUserRegistrations = async (userId: string): Promise<EventRegistration[]> => {
-    try {
-      // Fetch registrations
-      const { data: registrations, error: regError } = await supabase
-        .from("event_registrations")
-        .select("*")
-        .eq("user_id", userId);
-
-      if (regError) {
-        throw regError;
-      }
-
-      // Fetch team members for each registration
-      const registrationsWithTeamMembers = await Promise.all(
-        registrations.map(async (reg) => {
-          const { data: teamMembers, error: teamError } = await supabase
-            .from("team_members")
-            .select("*")
-            .eq("registration_id", reg.id);
-
-          if (teamError) {
-            console.error("Error fetching team members:", teamError);
-            return null;
-          }
-
-          return {
-            id: reg.id,
-            eventId: reg.event_id,
-            userId: reg.user_id,
-            teamName: reg.team_name,
-            registrationDate: reg.registration_date,
-            teamMembers: teamMembers.map((member) => ({
-              name: member.name,
-              department: member.department,
-              email: member.email,
-            })),
-          };
-        })
-      );
-
-      return registrationsWithTeamMembers.filter(Boolean) as EventRegistration[];
-    } catch (error: any) {
-      console.error("Error fetching user registrations:", error);
-      return [];
-    }
+    return registrationService.getUserRegistrations(userId);
   };
 
   // Function to get registrations by event ID
   const getRegistrationsByEventId = async (eventId: string) => {
-    try {
-      // Fetch registrations for the event
-      const { data: registrations, error: regError } = await supabase
-        .from("event_registrations")
-        .select("*")
-        .eq("event_id", eventId);
-
-      if (regError) {
-        throw regError;
-      }
-
-      // Fetch team members and user details for each registration
-      const detailedRegistrations = await Promise.all(
-        registrations.map(async (reg) => {
-          // Get team members
-          const { data: teamMembers, error: teamError } = await supabase
-            .from("team_members")
-            .select("*")
-            .eq("registration_id", reg.id);
-
-          if (teamError) {
-            console.error("Error fetching team members:", teamError);
-            return null;
-          }
-
-          // Get user details - Fixed: Handle case when profile may not exist or fields may be missing
-          const { data: userData, error: userError } = await supabase
-            .from("profiles")
-            .select("name")
-            .eq("id", reg.user_id)
-            .single();
-
-          // Safe defaults if user profile doesn't exist or has an error
-          let userName = "Unknown User";
-          
-          // Only try to access userData if it exists and there's no error
-          if (!userError && userData) {
-            userName = userData.name || "Unknown User";
-          }
-
-          return {
-            id: reg.id,
-            eventId: reg.event_id,
-            userId: reg.user_id,
-            userName: userName,
-            userEmail: "No email", // Removed email access since it doesn't exist in profiles table
-            teamName: reg.team_name,
-            registrationDate: reg.registration_date,
-            teamMembers: teamMembers || [],
-          };
-        })
-      );
-
-      return detailedRegistrations.filter(Boolean);
-    } catch (error: any) {
-      console.error("Error fetching event registrations:", error);
-      return [];
-    }
+    return registrationService.getRegistrationsByEventId(eventId);
   };
 
   // Fetch events when the context is first used
