@@ -54,24 +54,32 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Function to add a new event
-  const addEvent = async (event: Omit<Event, "id">) => {
-    setLoading(true);
-    try {
-      const newEvent = await eventService.addEvent(event);
-      if (newEvent) {
-        setEvents((prevEvents) => [...prevEvents, newEvent]);
-      }
-    } catch (error: any) {
-      console.error("Error adding event:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add event",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+ const fetchEvents = async () => {
+  setLoading(true);
+  try {
+    console.log("EventsContext: Fetching events...");
+    const eventsData = await eventService.fetchEvents();
+    console.log("EventsContext: Events fetched:", eventsData?.length || 0);
+
+    if (Array.isArray(eventsData)) {
+      setEvents(eventsData);
+    } else {
+      console.warn("EventsContext: No events data received. Setting events to empty array.");
+      setEvents([]); // Fail safe
     }
-  };
+  } catch (error: any) {
+    console.error("EventsContext: Error fetching events:", error);
+    toast({
+      title: "Error",
+      description: error.message || "Failed to fetch events",
+      variant: "destructive",
+    });
+    setEvents([]); // Important: even if error, set safe empty events
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Function to delete an event
   const deleteEvent = async (id: string) => {
