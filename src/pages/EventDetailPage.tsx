@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
@@ -31,7 +30,7 @@ const EventDetailPage = () => {
 
   const [teamName, setTeamName] = useState('');
   const [teamMembers, setTeamMembers] = useState([
-    { name: user?.name || '', department: '', email: user?.email || '' },
+    { name: user?.name || '', department: '', email: '' },
     { name: '', department: '', email: '' },
   ]);
   const [isRegistering, setIsRegistering] = useState(false);

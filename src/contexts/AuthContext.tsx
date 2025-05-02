@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,31 +32,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
-    const session = supabase.auth.getSession();
-
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.session?.user) {
-        // Get session data
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      
+      if (data.session) {
         setIsAuthenticated(true);
-        await getUserProfile(session.session.user.id);
+        await getUserProfile(data.session.user.id);
       } else {
-        // If no session, set auth status to false and user to null
         setIsAuthenticated(false);
         setUser(null);
       }
       setLoading(false);
-    })
+    };
 
-    if (session) {
-      // Get session data
-      setIsAuthenticated(true);
-      getUserProfile(session.data.session?.user.id!);
-    } else {
-      // If no session, set auth status to false and user to null
-      setIsAuthenticated(false);
-      setUser(null);
-    }
-    setLoading(false);
+    getInitialSession();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) {
+        setIsAuthenticated(true);
+        await getUserProfile(session.user.id);
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Function to get user profile

@@ -67,7 +67,8 @@ const RegisterPage = () => {
     setIsLoading(true);
     
     try {
-      await register(name, email, password, role, adminCode);
+      // Remove the adminCode parameter from the register function call
+      await register(name, email, password, role);
       toast({
         title: "Success",
         description: "Account created successfully. Please check your email to verify your account.",
