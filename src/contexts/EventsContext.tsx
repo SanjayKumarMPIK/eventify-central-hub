@@ -30,23 +30,31 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   // Function to fetch events
   const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      console.log("EventsContext: Fetching events...");
-      const eventsData = await eventService.fetchEvents();
-      console.log("EventsContext: Events fetched:", eventsData.length);
+  setLoading(true);
+  try {
+    console.log("EventsContext: Fetching events...");
+    const eventsData = await eventService.fetchEvents();
+    console.log("EventsContext: Events fetched:", eventsData?.length || 0);
+
+    if (Array.isArray(eventsData)) {
       setEvents(eventsData);
-    } catch (error: any) {
-      console.error("EventsContext: Error fetching events:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch events",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    } else {
+      console.warn("EventsContext: No events data received. Setting events to empty array.");
+      setEvents([]); // Fail safe
     }
-  };
+  } catch (error: any) {
+    console.error("EventsContext: Error fetching events:", error);
+    toast({
+      title: "Error",
+      description: error.message || "Failed to fetch events",
+      variant: "destructive",
+    });
+    setEvents([]); // Important: even if error, set safe empty events
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Function to get event by ID
   const getEventById = (id: string) => {
