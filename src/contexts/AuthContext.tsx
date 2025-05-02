@@ -1,198 +1,224 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from "@/hooks/use-toast"
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Session, User } from "@supabase/supabase-js";
-import { useToast } from "@/hooks/use-toast";
-
-// Define our own extended User type with the metadata fields we need
-interface UserWithMeta extends User {
-  name?: string;
-  role?: 'student' | 'admin';
+// Define the types for user and auth context
+interface User {
+  id: string;
+  name: string;
+  role: 'student' | 'admin';
 }
 
 interface AuthContextType {
-  user: UserWithMeta | null;
-  session: Session | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: "student" | "admin", adminCode?: string) => Promise<void>;
-  logout: () => Promise<void>;
+  user: User | null;
   isAuthenticated: boolean;
+  loading: boolean;
+  register: (name: string, email: string, password: string, role: 'student' | 'admin') => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-// Admin code for registering as an admin
-const ADMIN_REGISTRATION_CODE = "ADMIN123";
-
+// Create the auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserWithMeta | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+// AuthProvider component
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Helper function to process user data
-  const processUserData = async (session: Session | null) => {
-    if (!session?.user) {
-      setUser(null);
-      return;
-    }
+  useEffect(() => {
+    const session = supabase.auth.getSession();
 
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.session?.user) {
+        // Get session data
+        setIsAuthenticated(true);
+        await getUserProfile(session.session.user.id);
+      } else {
+        // If no session, set auth status to false and user to null
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+      setLoading(false);
+    })
+
+    if (session) {
+      // Get session data
+      setIsAuthenticated(true);
+      getUserProfile(session.data.session?.user.id!);
+    } else {
+      // If no session, set auth status to false and user to null
+      setIsAuthenticated(false);
+      setUser(null);
+    }
+    setLoading(false);
+  }, []);
+
+  // Function to get user profile
+  const getUserProfile = async (userId: string) => {
     try {
-      // Check if the user profile exists in the profile table
-      const { data: profileData, error: profileError } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", session.user.id)
+        .eq("id", userId)
         .single();
 
-      if (profileError || !profileData) {
-        console.error("Profile not found:", profileError);
-        // If profile doesn't exist, log the user out as they might have been deleted
-        await supabase.auth.signOut();
-        setUser(null);
-        setSession(null);
-        toast({
-          title: "Authentication Error",
-          description: "Your account was not found. Please register again.",
-          variant: "destructive",
-        });
-        return;
-      }
+      if (error) throw error;
+      if (!data) throw new Error("Profile not found");
 
-      const userData = session.user as UserWithMeta;
-      
-      // Get the user's metadata from the profile table
-      userData.name = profileData.name;
-      userData.role = profileData.role as 'student' | 'admin';
-      
-      setUser(userData);
+      // Update user state with profile data
+      setUser({
+        id: userId,
+        name: data.name,
+        role: data.role as "student" | "admin" // Add type assertion to fix the error
+      });
     } catch (error) {
-      console.error("Error processing user data:", error);
+      console.error("Error fetching user profile:", error);
+      // If profile not found, log out the user
+      await logout();
       setUser(null);
     }
   };
 
-  useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        setSession(currentSession);
-        
-        if (event === 'SIGNED_IN') {
-          processUserData(currentSession);
-          toast({
-            title: "Signed in",
-            description: "You have successfully signed in",
-          });
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          toast({
-            title: "Signed out",
-            description: "You have been signed out",
-          });
+  // Register function
+  const register = async (name: string, email: string, password: string, role: 'student' | 'admin') => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            name: name,
+            role: role,
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Create user profile in 'profiles' table
+      if (data.user?.id) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              name: name,
+              role: role,
+              email: email,
+            },
+          ]);
+
+        if (profileError) {
+          throw profileError;
         }
       }
-    );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      processUserData(currentSession).finally(() => {
-        setLoading(false);
+      setIsAuthenticated(true);
+      setUser({ id: data.user!.id, name: name, role: role });
+      toast({
+        title: "Success",
+        description: "Registration successful",
       });
-    });
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error("Registration error:", error.message);
+      toast({
+        title: "Error",
+        description: error.message || "Registration failed",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [toast]); // Keep only toast in the dependency array
-
+  // Login function
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
       });
 
       if (error) {
         throw error;
       }
-    } catch (error) {
-      console.error("Login failed:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const register = async (name: string, email: string, password: string, role: "student" | "admin", adminCode?: string) => {
-    setLoading(true);
-    try {
-      // Check if trying to register as admin
-      if (role === "admin") {
-        // Verify admin code
-        if (!adminCode || adminCode !== ADMIN_REGISTRATION_CODE) {
-          throw new Error("Invalid admin registration code");
-        }
-      }
-
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role
-          }
-        }
+      setIsAuthenticated(true);
+      await getUserProfile(data.user!.id);
+      toast({
+        title: "Success",
+        description: "Login successful",
       });
-
-      if (error) {
-        throw error;
-      }
-    } catch (error) {
-      console.error("Registration failed:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        throw error;
-      }
-    } catch (error) {
-      console.error("Logout failed:", error);
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error("Login error:", error.message);
       toast({
         title: "Error",
-        description: "Failed to sign out",
+        description: error.message || "Login failed",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Logout function
+  const logout = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
+
+      setIsAuthenticated(false);
+      setUser(null);
+      toast({
+        title: "Success",
+        description: "Logout successful",
+      });
+      navigate('/');
+    } catch (error: any) {
+      console.error("Logout error:", error.message);
+      toast({
+        title: "Error",
+        description: error.message || "Logout failed",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Provide the auth context value
+  const value: AuthContextType = {
+    user,
+    isAuthenticated,
+    loading,
+    register,
+    login,
+    logout,
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        login,
-        register,
-        logout,
-        loading,
-        isAuthenticated: !!user,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
+// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

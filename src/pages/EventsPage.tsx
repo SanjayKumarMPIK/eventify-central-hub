@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
@@ -19,6 +18,7 @@ const EventsPage = () => {
   
   // Refresh events when the page loads
   useEffect(() => {
+    console.log("EventsPage mounted, fetching events");
     fetchEvents();
   }, [fetchEvents]);
   
@@ -52,7 +52,7 @@ const EventsPage = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                <div key={i.toString()} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
                   <Skeleton className="h-48 w-full" />
                   <div className="p-5 flex-1 flex flex-col">
                     <Skeleton className="h-6 w-3/4 mb-2" />
@@ -75,6 +75,8 @@ const EventsPage = () => {
       </>
     );
   }
+
+  console.log("Events loaded:", events.length, "Filtered events:", filteredEvents.length);
 
   return (
     <>

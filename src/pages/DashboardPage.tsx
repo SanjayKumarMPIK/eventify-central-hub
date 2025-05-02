@@ -8,18 +8,19 @@ import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import StudentDashboard from '@/components/dashboard/StudentDashboard';
 
 const DashboardPage = () => {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { fetchEvents, loading: eventsLoading } = useEvents();
 
   // Load events when dashboard mounts
   useEffect(() => {
     if (isAuthenticated) {
+      console.log("Dashboard mounted, fetching events");
       fetchEvents();
     }
   }, [isAuthenticated, fetchEvents]);
 
   // Show loading state
-  if (loading || eventsLoading) {
+  if (authLoading || eventsLoading) {
     return (
       <>
         <Navbar />
@@ -46,8 +47,11 @@ const DashboardPage = () => {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated || !user) {
+    console.log("User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
+
+  console.log("Dashboard rendering for user:", user);
 
   return (
     <>
