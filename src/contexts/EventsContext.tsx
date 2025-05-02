@@ -172,7 +172,6 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       }
 
       setEvents((prevEvents) => [...prevEvents, data]);
-      return data;
     } catch (error: any) {
       console.error("Error adding event:", error);
       toast({
@@ -314,8 +313,6 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         await fetchUserRegistrations(user.id);
       }
-
-      return registrationData;
     } catch (error: any) {
       console.error("Error registering for event:", error);
       toast({

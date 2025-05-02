@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,40 @@ interface CertificatePreviewProps {
 const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
   const { getEventById, getUserRegistrations } = useEvents();
   const { user } = useAuth();
+  const [registration, setRegistration] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   
   const event = getEventById(eventId);
+  
+  // Fetch registration data when component mounts
+  useEffect(() => {
+    const fetchRegistration = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const registrations = await getUserRegistrations(user.id);
+        const foundRegistration = registrations.find(reg => reg.eventId === eventId);
+        setRegistration(foundRegistration);
+      } catch (error) {
+        console.error("Error fetching registration:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchRegistration();
+  }, [eventId, user, getUserRegistrations]);
+  
+  if (loading) {
+    return (
+      <div className="text-center p-8">
+        <p>Loading certificate information...</p>
+      </div>
+    );
+  }
   
   if (!event || !user) {
     return (
@@ -24,9 +56,6 @@ const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
       </div>
     );
   }
-  
-  const registrations = getUserRegistrations(user.id);
-  const registration = registrations.find(reg => reg.eventId === eventId);
   
   if (!registration) {
     return (
