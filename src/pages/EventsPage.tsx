@@ -8,19 +8,34 @@ import { Calendar, Search, MapPin, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import Navbar from '@/components/Navbar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 const EventsPage = () => {
   const { events, loading, fetchEvents } = useEvents();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   
-  // Refresh events when the page loads
+  // Refresh events when the page loads with better error handling
   useEffect(() => {
     console.log("EventsPage mounted, fetching events");
-    fetchEvents();
-  }, [fetchEvents]);
+    const loadEvents = async () => {
+      try {
+        await fetchEvents();
+      } catch (error) {
+        console.error("Failed to load events:", error);
+        toast({
+          title: "Error loading events",
+          description: "Please try again later",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    loadEvents();
+  }, [fetchEvents, toast]);
   
   // Extract unique departments for filtering
   const departments = ['all', ...Array.from(new Set(events.map(event => event.department)))];
@@ -34,6 +49,8 @@ const EventsPage = () => {
     
     return matchesSearch && matchesDepartment;
   });
+
+  console.log("Events loaded:", events.length, "Filtered events:", filteredEvents.length);
 
   // Loading skeleton
   if (loading) {
@@ -76,8 +93,6 @@ const EventsPage = () => {
     );
   }
 
-  console.log("Events loaded:", events.length, "Filtered events:", filteredEvents.length);
-
   return (
     <>
       <Navbar />
@@ -116,6 +131,12 @@ const EventsPage = () => {
             <div className="text-center py-16">
               <h3 className="text-xl font-medium text-gray-600">No events found</h3>
               <p className="text-gray-500 mt-2">Try adjusting your filters or search term.</p>
+              {events.length === 0 && (
+                <div className="mt-4">
+                  <p className="text-gray-500 mb-2">There are currently no events in the database.</p>
+                  <Button onClick={() => fetchEvents()}>Refresh</Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -126,6 +147,10 @@ const EventsPage = () => {
                       src={event.image} 
                       alt={event.title}
                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        // Fallback for missing/invalid image URLs
+                        (e.target as HTMLImageElement).src = '/placeholder.svg';
+                      }}
                     />
                   </div>
                   

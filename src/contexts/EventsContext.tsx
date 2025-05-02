@@ -32,10 +32,12 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const fetchEvents = async () => {
     setLoading(true);
     try {
+      console.log("EventsContext: Fetching events...");
       const eventsData = await eventService.fetchEvents();
+      console.log("EventsContext: Events fetched:", eventsData.length);
       setEvents(eventsData);
     } catch (error: any) {
-      console.error("Error fetching events:", error);
+      console.error("EventsContext: Error fetching events:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to fetch events",
@@ -177,6 +179,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch events when the context is first used
   useEffect(() => {
+    console.log("EventsContext: Initial fetch");
     fetchEvents();
   }, []);
 

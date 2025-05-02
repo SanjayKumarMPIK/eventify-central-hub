@@ -4,12 +4,16 @@ import { Event } from '@/types/event.types';
 
 export async function fetchEvents(): Promise<Event[]> {
   try {
+    console.log("Fetching events from Supabase");
     const { data, error } = await supabase.from("events").select("*");
 
     if (error) {
+      console.error("Error fetching events:", error);
       throw error;
     }
 
+    console.log("Events data received:", data);
+    
     // Map the data to our Event type
     const eventsData: Event[] = data.map((event: any) => ({
       id: event.id,
