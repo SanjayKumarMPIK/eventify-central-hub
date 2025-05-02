@@ -1,16 +1,25 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEvents } from '@/contexts/EventsContext';
 import Navbar from '@/components/Navbar';
 import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import StudentDashboard from '@/components/dashboard/StudentDashboard';
 
 const DashboardPage = () => {
   const { user, isAuthenticated, loading } = useAuth();
+  const { fetchEvents, loading: eventsLoading } = useEvents();
+
+  // Load events when dashboard mounts
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchEvents();
+    }
+  }, [isAuthenticated, fetchEvents]);
 
   // Show loading state
-  if (loading) {
+  if (loading || eventsLoading) {
     return (
       <>
         <Navbar />

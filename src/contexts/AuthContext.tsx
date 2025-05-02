@@ -30,23 +30,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  
-  // Remove the useNavigate hook from here
 
   // Helper function to process user data
-  const processUserData = (session: Session | null) => {
+  const processUserData = async (session: Session | null) => {
     if (!session?.user) {
       setUser(null);
       return;
     }
 
-    const userData = session.user as UserWithMeta;
-    
-    // Get the user's metadata from user_metadata
-    userData.name = session.user.user_metadata?.name;
-    userData.role = session.user.user_metadata?.role;
-    
-    setUser(userData);
+    try {
+      // Check if the user profile exists in the profile table
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        console.error("Profile not found:", profileError);
+        // If profile doesn't exist, log the user out as they might have been deleted
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        toast({
+          title: "Authentication Error",
+          description: "Your account was not found. Please register again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const userData = session.user as UserWithMeta;
+      
+      // Get the user's metadata from the profile table
+      userData.name = profileData.name;
+      userData.role = profileData.role;
+      
+      setUser(userData);
+    } catch (error) {
+      console.error("Error processing user data:", error);
+      setUser(null);
+    }
   };
 
   useEffect(() => {
@@ -54,19 +78,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         setSession(currentSession);
-        processUserData(currentSession);
         
         if (event === 'SIGNED_IN') {
+          processUserData(currentSession);
           toast({
             title: "Signed in",
             description: "You have successfully signed in",
           });
         } else if (event === 'SIGNED_OUT') {
+          setUser(null);
           toast({
             title: "Signed out",
             description: "You have been signed out",
           });
-          // Remove the navigate call from here
         }
       }
     );
@@ -74,8 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
-      processUserData(currentSession);
-      setLoading(false);
+      processUserData(currentSession).finally(() => {
+        setLoading(false);
+      });
     });
 
     return () => {
