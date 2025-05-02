@@ -121,6 +121,9 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       }
 
       setEvents((prevEvents) => [...prevEvents, data]);
+      
+      // Return void to match the function signature
+      return;
     } catch (error: any) {
       console.error("Error adding event:", error);
       toast({
@@ -260,10 +263,13 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         description: "Registration successful",
       });
 
-      // Refresh user registrations
+      // Fixed: Changed fetchUserRegistrations to getUserRegistrations
       if (user) {
-        await fetchUserRegistrations(user.id);
+        await getUserRegistrations(user.id);
       }
+      
+      // Return void to match the function signature
+      return;
     } catch (error: any) {
       console.error("Error registering for event:", error);
       toast({
@@ -371,23 +377,27 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
             return null;
           }
 
-          // Get user details
+          // Get user details - Fixed: Handle case when profile may not exist or fields may be missing
           const { data: userData, error: userError } = await supabase
             .from("profiles")
-            .select("name, email")
+            .select("name")
             .eq("id", reg.user_id)
             .single();
 
-          if (userError && userError.code !== 'PGRST116') { // PGRST116 is "no rows returned" which is ok
-            console.error("Error fetching user details:", userError);
+          // Safe defaults if user profile doesn't exist or has an error
+          let userName = "Unknown User";
+          
+          // Only try to access userData if it exists and there's no error
+          if (!userError && userData) {
+            userName = userData.name || "Unknown User";
           }
 
           return {
             id: reg.id,
             eventId: reg.event_id,
             userId: reg.user_id,
-            userName: userData?.name || "Unknown User",
-            userEmail: userData?.email || "No email",
+            userName: userName,
+            userEmail: "No email", // Removed email access since it doesn't exist in profiles table
             teamName: reg.team_name,
             registrationDate: reg.registration_date,
             teamMembers: teamMembers || [],
