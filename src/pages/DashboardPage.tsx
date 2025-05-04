@@ -16,8 +16,8 @@ const DashboardPage = () => {
 
   // Load events when dashboard mounts
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log("Dashboard mounted, fetching events");
+    if (isAuthenticated && user) {
+      console.log("Dashboard mounted, fetching events for user:", user.id);
       fetchEvents().catch(error => {
         console.error("Error fetching events in dashboard:", error);
         toast({
@@ -27,7 +27,7 @@ const DashboardPage = () => {
         });
       });
     }
-  }, [isAuthenticated, fetchEvents]);
+  }, [isAuthenticated, user, fetchEvents]);
 
   // Show loading state
   if (authLoading) {
@@ -38,7 +38,7 @@ const DashboardPage = () => {
           <div className="container mx-auto px-4 text-center">
             <div className="flex flex-col items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-eventify-purple mb-4" />
-              <p className="text-lg">Loading authentication data...</p>
+              <p className="text-lg">Verifying authentication...</p>
             </div>
           </div>
         </div>
@@ -70,21 +70,6 @@ const DashboardPage = () => {
                 ? 'Manage your events and view registrations'
                 : 'View your event registrations and certificates'}
             </p>
-            
-            {eventsLoading && (
-              <div className="mt-4 flex items-center text-sm text-gray-500">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                <span>Loading your events...</span>
-              </div>
-            )}
-            
-            {!eventsLoading && events.length === 0 && (
-              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                <p className="text-amber-700 text-sm">
-                  No events found. {user.role === 'admin' ? 'Create your first event!' : 'Register for an event to see it here.'}
-                </p>
-              </div>
-            )}
           </div>
 
           {user.role === 'admin' ? <AdminDashboard /> : <StudentDashboard />}

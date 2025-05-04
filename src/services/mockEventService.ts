@@ -40,13 +40,9 @@ export const mockEvents: Event[] = [
   }
 ];
 
-// You can uncomment and modify the fetchEvents function below to use mock data
-// if you're having issues with the actual API
-
-/*
-export async function fetchEventsMock(): Promise<Event[]> {
+// Export a function to fetch mock events
+export const fetchEventsMock = async (): Promise<Event[]> => {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 800));
   return mockEvents;
-}
-*/
+};

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -30,31 +29,53 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   // Function to fetch events
   const fetchEvents = async () => {
-  setLoading(true);
-  try {
-    console.log("EventsContext: Fetching events...");
-    const eventsData = await eventService.fetchEvents();
-    console.log("EventsContext: Events fetched:", eventsData?.length || 0);
-
-    if (Array.isArray(eventsData)) {
-      setEvents(eventsData);
-    } else {
-      console.warn("EventsContext: No events data received. Setting events to empty array.");
-      setEvents([]); // Fail safe
+    setLoading(true);
+    try {
+      console.log("EventsContext: Fetching events...");
+      
+      // Try to use mock data if database is empty
+      const eventsData = await eventService.fetchEvents();
+      console.log("EventsContext: Events fetched:", eventsData?.length || 0);
+      
+      // If we have real data from the database, use that
+      if (Array.isArray(eventsData) && eventsData.length > 0) {
+        console.log("EventsContext: Setting real event data from database");
+        setEvents(eventsData);
+      } 
+      // Otherwise, try to use mock data
+      else {
+        console.log("EventsContext: No events found in database, adding mock data");
+        try {
+          // Import mock events using dynamic import to avoid issues
+          const { mockEvents } = await import('@/services/mockEventService');
+          console.log("EventsContext: Mock events loaded:", mockEvents.length);
+          setEvents(mockEvents);
+        } catch (mockError) {
+          console.warn("EventsContext: Could not load mock events:", mockError);
+          setEvents([]); // Default empty array
+        }
+      }
+    } catch (error: any) {
+      console.error("EventsContext: Error fetching events:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch events",
+        variant: "destructive",
+      });
+      
+      // Try to use mock data if the real fetch failed
+      try {
+        const { mockEvents } = await import('@/services/mockEventService');
+        console.log("EventsContext: Using mock events after fetch error");
+        setEvents(mockEvents);
+      } catch (mockError) {
+        console.warn("EventsContext: Could not load mock events as fallback:", mockError);
+        setEvents([]); // Default empty array
+      }
+    } finally {
+      setLoading(false);
     }
-  } catch (error: any) {
-    console.error("EventsContext: Error fetching events:", error);
-    toast({
-      title: "Error",
-      description: error.message || "Failed to fetch events",
-      variant: "destructive",
-    });
-    setEvents([]); // Important: even if error, set safe empty events
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   // Function to get event by ID
   const getEventById = (id: string) => {
@@ -62,7 +83,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Function to add a new event
- const addEvent = async (event: Omit<Event, "id">) => {
+  const addEvent = async (event: Omit<Event, "id">) => {
     setLoading(true);
     try {
       const newEvent = await eventService.addEvent(event);
@@ -80,7 +101,6 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   };
-
 
   // Function to delete an event
   const deleteEvent = async (id: string) => {
@@ -178,7 +198,10 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   // Function to get user registrations
   const getUserRegistrations = async (userId: string): Promise<EventRegistration[]> => {
-    return registrationService.getUserRegistrations(userId);
+    console.log("EventsContext: Getting registrations for user:", userId);
+    const registrations = await registrationService.getUserRegistrations(userId);
+    console.log("EventsContext: Got user registrations:", registrations.length);
+    return registrations;
   };
 
   // Function to get registrations by event ID

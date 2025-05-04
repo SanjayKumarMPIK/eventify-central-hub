@@ -26,7 +26,7 @@ import CertificatePreview from './CertificatePreview';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const StudentDashboard = () => {
-  const { events, getUserRegistrations, loading } = useEvents();
+  const { events, getUserRegistrations, loading: eventsLoading } = useEvents();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -40,14 +40,19 @@ const StudentDashboard = () => {
       if (user) {
         setLoadingRegistrations(true);
         try {
+          console.log("Fetching user registrations for user:", user.id);
           // Get user registrations
           const userRegs = await getUserRegistrations(user.id);
+          console.log("User registrations received:", userRegs.length);
           
           // Get registered events details
           const regsWithEvents = userRegs
             .map(reg => {
               const event = events.find(e => e.id === reg.eventId);
-              if (!event) return null;
+              if (!event) {
+                console.log(`Event not found for registration: ${reg.eventId}`);
+                return null;
+              }
               
               return {
                 ...event,
@@ -59,6 +64,7 @@ const StudentDashboard = () => {
             })
             .filter(Boolean);
           
+          console.log("Registered events with details:", regsWithEvents.length);
           setRegisteredEvents(regsWithEvents);
         } catch (error) {
           console.error("Error fetching user registrations:", error);
@@ -68,10 +74,15 @@ const StudentDashboard = () => {
       }
     };
 
-    if (!loading && events.length > 0) {
+    // Only fetch registrations once we have both the user and events loaded
+    if (user && !eventsLoading) {
+      console.log("User and events ready, fetching registrations");
       fetchUserRegistrations();
+    } else if (!user) {
+      console.log("No user available, skipping registration fetch");
+      setLoadingRegistrations(false);
     }
-  }, [user, getUserRegistrations, events, loading]);
+  }, [user, getUserRegistrations, events, eventsLoading]);
 
   const handlePreviewCertificate = (eventId: string) => {
     setPreviewEvent(eventId);
@@ -87,8 +98,8 @@ const StudentDashboard = () => {
     setPreviewEvent(null);
   };
 
-  // Loading state
-  if (loading || loadingRegistrations) {
+  // Combined loading state - show loading UI when either events or registrations are loading
+  if (eventsLoading || (loadingRegistrations && user)) {
     return (
       <div>
         <Tabs defaultValue="myEvents" className="w-full">
