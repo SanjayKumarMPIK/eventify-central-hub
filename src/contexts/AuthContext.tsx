@@ -12,7 +12,7 @@ interface AuthContextType {
   loading: boolean;
   register: (name: string, email: string, password: string, role: 'student' | 'admin') => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => Promise<void>; // This stays as Promise<void>
 }
 
 // Create the auth context
@@ -120,13 +120,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Logout function - Fixed to ensure proper state cleanup
-  const logout = async () => {
+  // Logout function - Fixed to ensure proper state cleanup and type compatibility
+  const logout = async (): Promise<void> => { // Explicitly return Promise<void> here
     setLoading(true);
     try {
       console.log("AuthContext: Logging out user");
-      const result = await logoutUser();
-      console.log("Logout service result:", result);
+      // Call logoutUser but ignore the boolean return value
+      await logoutUser();
       
       // Important: Clear user state AFTER successful logout
       setIsAuthenticated(false);
@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("Navigating to home after logout");
       navigate('/', { replace: true });
       
-      return result;
+      // No return value needed here as we're returning Promise<void>
     } catch (error) {
       console.error("Logout error in context:", error);
       throw error;

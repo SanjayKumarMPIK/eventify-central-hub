@@ -128,7 +128,7 @@ export const loginUser = async (email: string, password: string) => {
   }
 }
 
-export const logoutUser = async () => {
+export const logoutUser = async (): Promise<void> => {
   try {
     console.log("Auth service: Logging out user...");
     const { error } = await supabase.auth.signOut();
@@ -144,7 +144,7 @@ export const logoutUser = async () => {
       description: "Logout successful",
     });
     
-    return true;
+    // Changed to return void instead of boolean
   } catch (error: any) {
     console.error("Logout error:", error.message);
     toast({
