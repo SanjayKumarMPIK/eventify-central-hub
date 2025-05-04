@@ -19,7 +19,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface EventRegistrationsProps {
   selectedEvent: string | null;
@@ -27,46 +26,18 @@ interface EventRegistrationsProps {
 }
 
 const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrationsProps) => {
-  const { events, getRegistrationsByEventId, loading } = useEvents();
+  const { events, getRegistrationsByEventId } = useEvents();
   const [registrations, setRegistrations] = useState<any[]>([]);
-  const [loadingRegistrations, setLoadingRegistrations] = useState<boolean>(false);
   
   useEffect(() => {
-    const fetchRegistrations = async () => {
-      if (selectedEvent) {
-        setLoadingRegistrations(true);
-        try {
-          const eventRegistrations = await getRegistrationsByEventId(selectedEvent);
-          setRegistrations(eventRegistrations);
-        } catch (error) {
-          console.error("Error fetching registrations:", error);
-        } finally {
-          setLoadingRegistrations(false);
-        }
-      } else if (events.length > 0) {
-        // If no event is selected, show the first event's registrations
-        setSelectedEvent(events[0].id);
-      }
-    };
-    
-    fetchRegistrations();
+    if (selectedEvent) {
+      const eventRegistrations = getRegistrationsByEventId(selectedEvent);
+      setRegistrations(eventRegistrations);
+    } else if (events.length > 0) {
+      // If no event is selected, show the first event's registrations
+      setSelectedEvent(events[0].id);
+    }
   }, [selectedEvent, events, getRegistrationsByEventId, setSelectedEvent]);
-
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <Skeleton className="h-7 w-64 mb-2" />
-            <Skeleton className="h-5 w-80" />
-          </div>
-          <Skeleton className="w-64 h-10" />
-        </div>
-        
-        <Skeleton className="w-full h-64" />
-      </div>
-    );
-  }
 
   if (events.length === 0) {
     return (
@@ -80,83 +51,6 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
   }
 
   const selectedEventObj = events.find(e => e.id === selectedEvent);
-
-  if (loadingRegistrations) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">Event Registrations</h2>
-            <p className="text-gray-600">View and manage participant registrations</p>
-          </div>
-          
-          <div className="w-full md:w-64">
-            <Select 
-              value={selectedEvent || ''} 
-              onValueChange={(value) => setSelectedEvent(value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select an event" />
-              </SelectTrigger>
-              <SelectContent>
-                {events.map((event) => (
-                  <SelectItem key={event.id} value={event.id}>
-                    {event.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        {selectedEventObj && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-md">
-            <h3 className="font-medium">{selectedEventObj.title}</h3>
-            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
-              <div>
-                <span className="text-gray-500">Date:</span>{' '}
-                {format(new Date(selectedEventObj.date), 'MMMM dd, yyyy')}
-              </div>
-              <div>
-                <span className="text-gray-500">Time:</span>{' '}
-                {format(new Date(selectedEventObj.date), 'h:mm a')}
-              </div>
-              <div>
-                <span className="text-gray-500">Loading registrations...</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Available Slots:</span>{' '}
-                {selectedEventObj.available_slots} of {selectedEventObj.total_slots}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Team Name</TableHead>
-                <TableHead>Registration Date</TableHead>
-                <TableHead>Team Size</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[1, 2, 3].map((i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-9 w-24" /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -203,7 +97,7 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
             </div>
             <div>
               <span className="text-gray-500">Available Slots:</span>{' '}
-              {selectedEventObj.available_slots} of {selectedEventObj.total_slots}
+              {selectedEventObj.availableSlots} of {selectedEventObj.totalSlots}
             </div>
           </div>
         </div>

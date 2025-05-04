@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useEvents } from '@/contexts/EventsContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,10 +27,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Calendar, Users, Plus, Edit, Trash } from 'lucide-react';
 import { format } from 'date-fns';
 import EventRegistrations from './EventRegistrations';
-import { Skeleton } from '@/components/ui/skeleton';
 
 const AdminDashboard = () => {
-  const { events, addEvent, deleteEvent, increaseEventSlots, loading, fetchEvents } = useEvents();
+  const { events, addEvent, deleteEvent, increaseEventSlots } = useEvents();
   const { toast } = useToast();
   
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
@@ -44,7 +43,7 @@ const AdminDashboard = () => {
     date: '',
     time: '',
     location: '',
-    total_slots: 20,
+    totalSlots: 20,
     department: '',
     image: 'https://images.unsplash.com/photo-1523580494863-6f3031224c94',
   });
@@ -56,17 +55,12 @@ const AdminDashboard = () => {
   });
   const [isAddSlotsOpen, setIsAddSlotsOpen] = useState(false);
   
-  // Fetch latest events data when component mounts
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
-  
   const handleNewEventChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewEvent(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleAddEvent = async () => {
+  const handleAddEvent = () => {
     setIsLoading(true);
     
     try {
@@ -85,13 +79,13 @@ const AdminDashboard = () => {
       }
       
       // Create event
-      await addEvent({
+      addEvent({
         title: newEvent.title,
         description: newEvent.description,
         date: dateTimeString,
         location: newEvent.location,
-        total_slots: Number(newEvent.total_slots),
-        available_slots: Number(newEvent.total_slots),
+        totalSlots: Number(newEvent.totalSlots),
+        availableSlots: Number(newEvent.totalSlots),
         department: newEvent.department,
         image: newEvent.image,
       });
@@ -103,7 +97,7 @@ const AdminDashboard = () => {
         date: '',
         time: '',
         location: '',
-        total_slots: 20,
+        totalSlots: 20,
         department: '',
         image: 'https://images.unsplash.com/photo-1523580494863-6f3031224c94',
       });
@@ -125,9 +119,9 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleAddSlots = async () => {
+  const handleAddSlots = () => {
     try {
-      await increaseEventSlots(addSlotsData.eventId, Number(addSlotsData.additionalSlots));
+      increaseEventSlots(addSlotsData.eventId, Number(addSlotsData.additionalSlots));
       toast({
         title: "Success",
         description: `Added ${addSlotsData.additionalSlots} slots to the event`,
@@ -142,10 +136,10 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDeleteEvent = async (id: string) => {
+  const handleDeleteEvent = (id: string) => {
     if (window.confirm("Are you sure you want to delete this event? This action cannot be undone.")) {
       try {
-        await deleteEvent(id);
+        deleteEvent(id);
         toast({
           title: "Success",
           description: "Event deleted successfully",
@@ -159,46 +153,6 @@ const AdminDashboard = () => {
       }
     }
   };
-
-  if (loading) {
-    return (
-      <div>
-        <Tabs defaultValue="events" className="w-full">
-          <div className="flex justify-between items-center mb-4">
-            <TabsList>
-              <TabsTrigger value="events">Events</TabsTrigger>
-              <TabsTrigger value="registrations">Registrations</TabsTrigger>
-              <TabsTrigger value="certificates">Certificates</TabsTrigger>
-            </TabsList>
-            
-            <Skeleton className="h-10 w-32" />
-          </div>
-
-          <TabsContent value="events">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden">
-                  <Skeleton className="h-40 w-full" />
-                  <div className="p-5">
-                    <Skeleton className="h-6 w-3/4 mb-2" />
-                    <Skeleton className="h-4 w-full mb-4" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                    </div>
-                  </div>
-                  <div className="px-5 pb-5 flex justify-between">
-                    <Skeleton className="h-10 w-24" />
-                    <Skeleton className="h-10 w-20" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -282,13 +236,13 @@ const AdminDashboard = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="total_slots">Total Slots</Label>
+                  <Label htmlFor="totalSlots">Total Slots</Label>
                   <Input
-                    id="total_slots"
-                    name="total_slots"
+                    id="totalSlots"
+                    name="totalSlots"
                     type="number"
                     min="1"
-                    value={newEvent.total_slots}
+                    value={newEvent.totalSlots}
                     onChange={handleNewEventChange}
                   />
                 </div>
@@ -406,7 +360,7 @@ const AdminDashboard = () => {
                       </div>
                       <div className="flex items-center">
                         <Users className="h-4 w-4 mr-2 text-gray-500" />
-                        <span>{event.available_slots} / {event.total_slots} slots available</span>
+                        <span>{event.availableSlots} / {event.totalSlots} slots available</span>
                       </div>
                     </div>
                   </CardContent>

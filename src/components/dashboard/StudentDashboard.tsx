@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,66 +23,31 @@ import {
 import { Calendar, MapPin, Download, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import CertificatePreview from './CertificatePreview';
-import { Skeleton } from '@/components/ui/skeleton';
 
 const StudentDashboard = () => {
-  const { events, getUserRegistrations, loading: eventsLoading } = useEvents();
+  const { events, getUserRegistrations } = useEvents();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [previewEvent, setPreviewEvent] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<'certificate' | 'duty'>('certificate');
-  const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
-  const [loadingRegistrations, setLoadingRegistrations] = useState<boolean>(true);
   
-  useEffect(() => {
-    const fetchUserRegistrations = async () => {
-      if (user) {
-        setLoadingRegistrations(true);
-        try {
-          console.log("Fetching user registrations for user:", user.id);
-          // Get user registrations
-          const userRegs = await getUserRegistrations(user.id);
-          console.log("User registrations received:", userRegs.length);
-          
-          // Get registered events details
-          const regsWithEvents = userRegs
-            .map(reg => {
-              const event = events.find(e => e.id === reg.eventId);
-              if (!event) {
-                console.log(`Event not found for registration: ${reg.eventId}`);
-                return null;
-              }
-              
-              return {
-                ...event,
-                registrationId: reg.id,
-                registrationDate: reg.registrationDate,
-                teamName: reg.teamName,
-                teamMembers: reg.teamMembers,
-              };
-            })
-            .filter(Boolean);
-          
-          console.log("Registered events with details:", regsWithEvents.length);
-          setRegisteredEvents(regsWithEvents);
-        } catch (error) {
-          console.error("Error fetching user registrations:", error);
-        } finally {
-          setLoadingRegistrations(false);
-        }
-      }
+  // Get user registrations
+  const userRegistrations = user ? getUserRegistrations(user.id) : [];
+  
+  // Get registered events details
+  const registeredEvents = userRegistrations.map(reg => {
+    const event = events.find(e => e.id === reg.eventId);
+    if (!event) return null;
+    
+    return {
+      ...event,
+      registrationId: reg.id,
+      registrationDate: reg.registrationDate,
+      teamName: reg.teamName,
+      teamMembers: reg.teamMembers,
     };
-
-    // Only fetch registrations once we have both the user and events loaded
-    if (user && !eventsLoading) {
-      console.log("User and events ready, fetching registrations");
-      fetchUserRegistrations();
-    } else if (!user) {
-      console.log("No user available, skipping registration fetch");
-      setLoadingRegistrations(false);
-    }
-  }, [user, getUserRegistrations, events, eventsLoading]);
+  }).filter(Boolean);
 
   const handlePreviewCertificate = (eventId: string) => {
     setPreviewEvent(eventId);
@@ -97,44 +62,6 @@ const StudentDashboard = () => {
   const closePreview = () => {
     setPreviewEvent(null);
   };
-
-  // Combined loading state - show loading UI when either events or registrations are loading
-  if (eventsLoading || (loadingRegistrations && user)) {
-    return (
-      <div>
-        <Tabs defaultValue="myEvents" className="w-full">
-          <TabsList>
-            <TabsTrigger value="myEvents">My Events</TabsTrigger>
-            <TabsTrigger value="certificates">Certificates</TabsTrigger>
-            <TabsTrigger value="dutyLetters">On-Duty Letters</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="myEvents">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="overflow-hidden">
-                  <Skeleton className="h-40 w-full" />
-                  <CardHeader className="pb-2">
-                    <Skeleton className="h-5 w-3/4 mb-2" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-2 border-t">
-                    <Skeleton className="h-9 w-full" />
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
-  }
 
   return (
     <div>

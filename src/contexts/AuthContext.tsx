@@ -1,168 +1,124 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from "@/hooks/use-toast";
-import { User, getCurrentSession, getCurrentUser, registerUser, loginUser, logoutUser } from '@/services/authService';
+import React, { createContext, useContext, useState, useEffect } from "react";
 
-// Define the auth context type
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  loading: boolean;
-  register: (name: string, email: string, password: string, role: 'student' | 'admin') => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>; // This stays as Promise<void>
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "student" | "admin";
 }
 
-// Create the auth context
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  login: (email: string, password: string, role: "student" | "admin") => Promise<void>;
+  register: (name: string, email: string, password: string, role: "student" | "admin", adminCode?: string) => Promise<void>;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+// Admin code for registering as an admin
+const ADMIN_REGISTRATION_CODE = "ADMIN123";
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// AuthProvider component
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      try {
-        setLoading(true);
-        const session = await getCurrentSession();
-        
-        if (session) {
-          console.log("Initial session found:", session.user.id);
-          setIsAuthenticated(true);
-          await getUserProfile(session.user.id);
-        } else {
-          console.log("No initial session found");
-          setIsAuthenticated(false);
-          setUser(null);
-        }
-      } catch (error) {
-        console.error("Error getting initial session:", error);
-        setIsAuthenticated(false);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getInitialSession();
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.id);
-      setLoading(true);
-      try {
-        if (session) {
-          setIsAuthenticated(true);
-          await getUserProfile(session.user.id);
-        } else {
-          setIsAuthenticated(false);
-          setUser(null);
-        }
-      } catch (error) {
-        console.error("Error handling auth state change:", error);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Check for saved user in localStorage
+    const savedUser = localStorage.getItem("eventify_user");
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
   }, []);
 
-  // Function to get user profile
-  const getUserProfile = async (userId: string) => {
+  const login = async (email: string, password: string, role: "student" | "admin") => {
+    setLoading(true);
     try {
-      const userData = await getCurrentUser(userId);
-      console.log("Got user profile:", userData);
-      setUser(userData);
-      if (!userData) {
-        console.error("Profile not found, logging out");
-        await logout();
+      // Simulate API call
+      const foundUser = DUMMY_USERS.find(
+        (u) => u.email === email && u.password === password && u.role === role
+      );
+
+      if (!foundUser) {
+        throw new Error("Invalid credentials or user not found");
       }
+
+      const { password: _, ...userWithoutPassword } = foundUser;
+      
+      // Save user to local storage
+      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
+      setUser(userWithoutPassword as User);
     } catch (error) {
-      console.error("Error fetching user profile:", error);
-      // If profile not found, log out the user
-      await logout();
-    }
-  };
-
-  // Register function
-  const register = async (name: string, email: string, password: string, role: 'student' | 'admin') => {
-    setLoading(true);
-    try {
-      const { user: authUser } = await registerUser(name, email, password, role);
-      if (authUser) {
-        setIsAuthenticated(true);
-        setUser({ id: authUser.id, name, role });
-        navigate('/dashboard');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Login function
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      await loginUser(email, password);
-      navigate('/dashboard');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Logout function - Fixed to ensure proper state cleanup and type compatibility
-  const logout = async (): Promise<void> => { // Explicitly return Promise<void> here
-    setLoading(true);
-    try {
-      console.log("AuthContext: Logging out user");
-      // Call logoutUser but ignore the boolean return value
-      await logoutUser();
-      
-      // Important: Clear user state AFTER successful logout
-      setIsAuthenticated(false);
-      setUser(null);
-      
-      // Force navigation to home page
-      console.log("Navigating to home after logout");
-      navigate('/', { replace: true });
-      
-      // No return value needed here as we're returning Promise<void>
-    } catch (error) {
-      console.error("Logout error in context:", error);
+      console.error("Login failed:", error);
       throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  // Provide the auth context value
-  const value: AuthContextType = {
-    user,
-    isAuthenticated,
-    loading,
-    register,
-    login,
-    logout,
+  const register = async (name: string, email: string, password: string, role: "student" | "admin", adminCode?: string) => {
+    setLoading(true);
+    try {
+      // Check if trying to register as admin
+      if (role === "admin") {
+        // Verify admin code
+        if (!adminCode || adminCode !== ADMIN_REGISTRATION_CODE) {
+          throw new Error("Invalid admin registration code");
+        }
+      }
+
+      // Check if user already exists
+      if (DUMMY_USERS.some((u) => u.email === email)) {
+        throw new Error("User with this email already exists");
+      }
+
+      // In a real app, this would be a backend API call
+      const newUser = {
+        id: `${DUMMY_USERS.length + 1}`,
+        name,
+        email,
+        password,
+        role,
+      };
+
+      DUMMY_USERS.push(newUser);
+      
+      const { password: _, ...userWithoutPassword } = newUser;
+      localStorage.setItem("eventify_user", JSON.stringify(userWithoutPassword));
+      setUser(userWithoutPassword as User);
+    } catch (error) {
+      console.error("Registration failed:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("eventify_user");
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        loading,
+        isAuthenticated: !!user,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -170,3 +126,9 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// Dummy users for demonstration
+const DUMMY_USERS = [
+  { id: "1", name: "Admin User", email: "admin@eventify.com", password: "admin123", role: "admin" as const },
+  { id: "2", name: "Student User", email: "student@eventify.com", password: "student123", role: "student" as const },
+];
