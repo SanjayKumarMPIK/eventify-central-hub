@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -33,17 +34,14 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("EventsContext: Fetching events...");
       
-      // Try to use mock data if database is empty
+      // Try to use data from the database
       const eventsData = await eventService.fetchEvents();
       console.log("EventsContext: Events fetched:", eventsData?.length || 0);
       
-      // If we have real data from the database, use that
       if (Array.isArray(eventsData) && eventsData.length > 0) {
         console.log("EventsContext: Setting real event data from database");
         setEvents(eventsData);
-      } 
-      // Otherwise, try to use mock data
-      else {
+      } else {
         console.log("EventsContext: No events found in database, adding mock data");
         try {
           // Import mock events using dynamic import to avoid issues
@@ -199,9 +197,19 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   // Function to get user registrations
   const getUserRegistrations = async (userId: string): Promise<EventRegistration[]> => {
     console.log("EventsContext: Getting registrations for user:", userId);
-    const registrations = await registrationService.getUserRegistrations(userId);
-    console.log("EventsContext: Got user registrations:", registrations.length);
-    return registrations;
+    try {
+      const registrations = await registrationService.getUserRegistrations(userId);
+      console.log("EventsContext: Got user registrations:", registrations.length);
+      return registrations;
+    } catch (error) {
+      console.error("Error getting user registrations:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch your registrations",
+        variant: "destructive",
+      });
+      return [];
+    }
   };
 
   // Function to get registrations by event ID

@@ -143,8 +143,6 @@ export const logoutUser = async (): Promise<void> => {
       title: "Success",
       description: "Logout successful",
     });
-    
-    // Changed to return void instead of boolean
   } catch (error: any) {
     console.error("Logout error:", error.message);
     toast({

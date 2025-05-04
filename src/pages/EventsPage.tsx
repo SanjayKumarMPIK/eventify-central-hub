@@ -20,10 +20,12 @@ const EventsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [errorLoading, setErrorLoading] = useState(false);
 
   // Refresh events data
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    setErrorLoading(false);
     try {
       await fetchEvents();
       toast({
@@ -32,6 +34,7 @@ const EventsPage = () => {
       });
     } catch (error) {
       console.error("Error refreshing events:", error);
+      setErrorLoading(true);
       toast({
         title: "Refresh failed",
         description: "Could not update event list",
@@ -50,7 +53,7 @@ const EventsPage = () => {
   }, [events, loading]);
 
   // Unique departments for filter
-  const departments = ['all', ...Array.from(new Set(events.map(event => event.department)))];
+  const departments = ['all', ...Array.from(new Set(events.filter(event => event.department).map(event => event.department)))];
 
   // Filtering events
   const filteredEvents = events.filter(event => {
@@ -68,7 +71,10 @@ const EventsPage = () => {
         <main className="min-h-screen bg-gray-50 py-8">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-              <Skeleton className="h-10 w-48" />
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">Loading Events</h1>
+                <p className="text-gray-600 mt-1">Please wait while we fetch available events...</p>
+              </div>
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 <Skeleton className="h-10 w-64" />
                 <Skeleton className="h-10 w-48" />
@@ -145,6 +151,14 @@ const EventsPage = () => {
               </Button>
             </div>
           </div>
+
+          {errorLoading && (
+            <Alert className="mb-6 bg-red-50 border-red-200">
+              <AlertDescription>
+                Error loading events. Please try refreshing the page.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {events.length === 0 && (
             <Alert className="mb-6 bg-blue-50 border-blue-200">

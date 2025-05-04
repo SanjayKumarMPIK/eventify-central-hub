@@ -5,14 +5,22 @@ import { Event } from '@/types/event.types';
 export async function fetchEvents(): Promise<Event[]> {
   try {
     console.log("Fetching events from Supabase");
-    const { data, error } = await supabase.from("events").select("*");
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .order('date', { ascending: true });
 
     if (error) {
       console.error("Error fetching events:", error);
       throw error;
     }
 
-    console.log("Events data received:", data);
+    console.log("Events data received:", data?.length || 0);
+    
+    if (!data || data.length === 0) {
+      console.log("No events found in database");
+      return [];
+    }
     
     // Map the data to our Event type
     const eventsData: Event[] = data.map((event: any) => ({
@@ -30,7 +38,7 @@ export async function fetchEvents(): Promise<Event[]> {
     return eventsData;
   } catch (error: any) {
     console.error("Error fetching events:", error);
-    return [];
+    throw error; // Let the context handle the error
   }
 }
 
