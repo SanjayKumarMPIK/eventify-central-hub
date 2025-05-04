@@ -6,38 +6,39 @@ import { useEvents } from '@/contexts/EventsContext';
 import Navbar from '@/components/Navbar';
 import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import StudentDashboard from '@/components/dashboard/StudentDashboard';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 const DashboardPage = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const { fetchEvents, loading: eventsLoading } = useEvents();
+  const { fetchEvents, loading: eventsLoading, events } = useEvents();
 
   // Load events when dashboard mounts
   useEffect(() => {
     if (isAuthenticated) {
       console.log("Dashboard mounted, fetching events");
-      fetchEvents();
+      fetchEvents().catch(error => {
+        console.error("Error fetching events in dashboard:", error);
+        toast({
+          title: "Error loading events",
+          description: "There was a problem loading your events. Please try again.",
+          variant: "destructive",
+        });
+      });
     }
   }, [isAuthenticated, fetchEvents]);
 
   // Show loading state
-  if (authLoading || eventsLoading) {
+  if (authLoading) {
     return (
       <>
         <Navbar />
         <div className="min-h-screen bg-eventify-light py-8">
           <div className="container mx-auto px-4 text-center">
-            <div className="animate-pulse flex flex-col items-center justify-center">
-              <div className="w-48 h-8 bg-gray-200 rounded mb-4"></div>
-              <div className="w-64 h-4 bg-gray-200 rounded mb-12"></div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg shadow-md p-6">
-                    <div className="w-12 h-12 bg-gray-200 rounded mb-4"></div>
-                    <div className="w-3/4 h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="w-1/2 h-4 bg-gray-200 rounded"></div>
-                  </div>
-                ))}
-              </div>
+            <div className="flex flex-col items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-eventify-purple mb-4" />
+              <p className="text-lg">Loading authentication data...</p>
             </div>
           </div>
         </div>
@@ -52,6 +53,8 @@ const DashboardPage = () => {
   }
 
   console.log("Dashboard rendering for user:", user);
+  console.log("Events loaded:", events.length);
+  console.log("Events loading state:", eventsLoading);
 
   return (
     <>
@@ -67,6 +70,21 @@ const DashboardPage = () => {
                 ? 'Manage your events and view registrations'
                 : 'View your event registrations and certificates'}
             </p>
+            
+            {eventsLoading && (
+              <div className="mt-4 flex items-center text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <span>Loading your events...</span>
+              </div>
+            )}
+            
+            {!eventsLoading && events.length === 0 && (
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+                <p className="text-amber-700 text-sm">
+                  No events found. {user.role === 'admin' ? 'Create your first event!' : 'Register for an event to see it here.'}
+                </p>
+              </div>
+            )}
           </div>
 
           {user.role === 'admin' ? <AdminDashboard /> : <StudentDashboard />}

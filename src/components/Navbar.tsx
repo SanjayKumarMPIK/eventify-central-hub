@@ -12,8 +12,10 @@ const Navbar = () => {
   const handleLogout = async () => {
     console.log("Logout button clicked");
     try {
+      // Call logout and wait for it to complete
       await logout();
-      // No need to navigate here as it's handled in the AuthContext
+      console.log("Logout completed successfully");
+      // No need for navigation here as it's handled in AuthContext
     } catch (error) {
       console.error("Error during logout:", error);
     }

@@ -34,9 +34,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const session = await getCurrentSession();
         
         if (session) {
+          console.log("Initial session found:", session.user.id);
           setIsAuthenticated(true);
           await getUserProfile(session.user.id);
         } else {
+          console.log("No initial session found");
           setIsAuthenticated(false);
           setUser(null);
         }
@@ -52,8 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getInitialSession();
 
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("Auth state changed:", _event, session?.user?.id);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id);
       setLoading(true);
       try {
         if (session) {
@@ -79,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getUserProfile = async (userId: string) => {
     try {
       const userData = await getCurrentUser(userId);
+      console.log("Got user profile:", userData);
       setUser(userData);
       if (!userData) {
         console.error("Profile not found, logging out");
@@ -121,13 +124,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setLoading(true);
     try {
-      await logoutUser();
+      console.log("AuthContext: Logging out user");
+      const result = await logoutUser();
+      console.log("Logout service result:", result);
+      
       // Important: Clear user state AFTER successful logout
       setIsAuthenticated(false);
       setUser(null);
+      
+      // Force navigation to home page
+      console.log("Navigating to home after logout");
       navigate('/', { replace: true });
+      
+      return result;
     } catch (error) {
       console.error("Logout error in context:", error);
+      throw error;
     } finally {
       setLoading(false);
     }

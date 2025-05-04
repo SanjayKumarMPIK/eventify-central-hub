@@ -13,6 +13,7 @@ export interface User {
 export const getCurrentSession = async () => {
   try {
     const { data } = await supabase.auth.getSession();
+    console.log("Current session data:", data.session ? "Session exists" : "No session");
     return data.session;
   } catch (error: any) {
     console.error("Error getting session:", error.message);
@@ -22,15 +23,24 @@ export const getCurrentSession = async () => {
 
 export const getCurrentUser = async (userId: string): Promise<User | null> => {
   try {
+    console.log("Fetching user profile for ID:", userId);
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
 
-    if (error) throw error;
-    if (!data) throw new Error("Profile not found");
+    if (error) {
+      console.error("Supabase error getting profile:", error);
+      throw error;
+    }
+    
+    if (!data) {
+      console.error("No profile data found for user:", userId);
+      throw new Error("Profile not found");
+    }
 
+    console.log("Profile data retrieved:", data);
     return {
       id: userId,
       name: data.name,
@@ -120,12 +130,15 @@ export const loginUser = async (email: string, password: string) => {
 
 export const logoutUser = async () => {
   try {
-    console.log("Logging out user...");
+    console.log("Auth service: Logging out user...");
     const { error } = await supabase.auth.signOut();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase signOut error:", error);
+      throw error;
+    }
 
-    console.log("Logout successful");
+    console.log("Auth service: Logout successful");
     toast({
       title: "Success",
       description: "Logout successful",
