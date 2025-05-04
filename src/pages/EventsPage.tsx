@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
 import { Button } from '@/components/ui/button';
@@ -9,14 +10,44 @@ import { format } from 'date-fns';
 import Navbar from '@/components/Navbar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const EventsPage = () => {
   const navigate = useNavigate();
-  const { events, loading } = useEvents();
+  const { events, loading, fetchEvents } = useEvents();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Refresh events data
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchEvents();
+      toast({
+        title: "Refreshed",
+        description: "Event list has been updated",
+      });
+    } catch (error) {
+      console.error("Error refreshing events:", error);
+      toast({
+        title: "Refresh failed",
+        description: "Could not update event list",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Effect to log when events are loaded or change
+  useEffect(() => {
+    if (!loading) {
+      console.log("Events loaded:", events.length);
+    }
+  }, [events, loading]);
 
   // Unique departments for filter
   const departments = ['all', ...Array.from(new Set(events.map(event => event.department)))];
@@ -34,7 +65,7 @@ const EventsPage = () => {
     return (
       <>
         <Navbar />
-        <main className="min-h-screen bg-eventify-light py-8">
+        <main className="min-h-screen bg-gray-50 py-8">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
               <Skeleton className="h-10 w-48" />
@@ -72,24 +103,27 @@ const EventsPage = () => {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-eventify-light py-8">
+      <main className="min-h-screen bg-gray-50 py-8">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-            <h1 className="text-3xl font-bold">Upcoming Events</h1>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">Upcoming Events</h1>
+              <p className="text-gray-600 mt-1">Browse and register for events</p>
+            </div>
 
             <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Search events..."
-                  className="pl-10"
+                  className="pl-10 bg-white border-gray-300"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
               <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="w-full md:w-48">
+                <SelectTrigger className="w-full md:w-48 bg-white border-gray-300">
                   <SelectValue placeholder="Department" />
                 </SelectTrigger>
                 <SelectContent>
@@ -100,18 +134,43 @@ const EventsPage = () => {
                   ))}
                 </SelectContent>
               </Select>
+              
+              <Button 
+                variant="outline" 
+                onClick={handleRefresh} 
+                disabled={isRefreshing} 
+                className="w-full md:w-auto"
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh"}
+              </Button>
             </div>
           </div>
 
-          {filteredEvents.length === 0 ? (
-            <div className="text-center py-16">
+          {events.length === 0 && (
+            <Alert className="mb-6 bg-blue-50 border-blue-200">
+              <AlertDescription>
+                No events are currently available. Check back later for upcoming events.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {filteredEvents.length === 0 && events.length > 0 && (
+            <div className="text-center py-16 bg-white shadow-sm rounded-lg">
               <h3 className="text-xl font-medium text-gray-600">No events found</h3>
-              <p className="text-gray-500 mt-2">Try adjusting your filters or search term.</p>
+              <p className="text-gray-500 mt-2 mb-4">Try adjusting your filters or search term.</p>
+              <Button onClick={() => {
+                setSearchTerm('');
+                setDepartmentFilter('all');
+              }}>
+                Clear Filters
+              </Button>
             </div>
-          ) : (
+          )}
+
+          {filteredEvents.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredEvents.map((event) => (
-                <div key={event.id} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                <div key={event.id} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col border border-gray-100">
                   <div className="h-48 overflow-hidden">
                     <img
                       src={event.image || '/placeholder.svg'}
@@ -119,22 +178,23 @@ const EventsPage = () => {
                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        console.log(`Failed to load image for event: ${event.title}`);
                       }}
                     />
                   </div>
 
                   <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="text-xl font-semibold mb-2 line-clamp-1">{event.title}</h3>
+                    <h3 className="text-xl font-semibold mb-2 text-gray-800 line-clamp-1">{event.title}</h3>
 
                     <div className="flex items-center text-sm text-gray-600 mb-3">
-                      <Calendar className="h-4 w-4 mr-1" />
+                      <Calendar className="h-4 w-4 mr-1 text-gray-500" />
                       <span>
                         {event.date ? format(new Date(event.date), 'MMMM dd, yyyy - h:mm a') : 'Date not set'}
                       </span>
                     </div>
 
                     <div className="flex items-center text-sm text-gray-600 mb-3">
-                      <MapPin className="h-4 w-4 mr-1" />
+                      <MapPin className="h-4 w-4 mr-1 text-gray-500" />
                       <span>{event.location || 'No location provided'}</span>
                     </div>
 
@@ -156,7 +216,7 @@ const EventsPage = () => {
                   <div className="px-5 pb-5">
                     <Button
                       variant="default"
-                      className="w-full"
+                      className="w-full bg-eventify-purple hover:bg-eventify-purple/90"
                       onClick={() => navigate(`/events/${event.id}`)}
                     >
                       View Details
@@ -173,4 +233,3 @@ const EventsPage = () => {
 };
 
 export default EventsPage;
-
