@@ -13,21 +13,21 @@ export type Database = {
         Row: {
           event_id: string
           id: string
-          registration_date: string
+          registration_date: string | null
           team_name: string
           user_id: string
         }
         Insert: {
           event_id: string
           id?: string
-          registration_date?: string
+          registration_date?: string | null
           team_name: string
           user_id: string
         }
         Update: {
           event_id?: string
           id?: string
-          registration_date?: string
+          registration_date?: string | null
           team_name?: string
           user_id?: string
         }
@@ -44,66 +44,60 @@ export type Database = {
       events: {
         Row: {
           available_slots: number
-          created_at: string
+          created_at: string | null
           date: string
-          department: string
-          description: string
+          department: string | null
+          description: string | null
           id: string
-          image: string
-          location: string
+          image: string | null
+          location: string | null
           title: string
           total_slots: number
-          updated_at: string
         }
         Insert: {
-          available_slots: number
-          created_at?: string
+          available_slots?: number
+          created_at?: string | null
           date: string
-          department: string
-          description: string
+          department?: string | null
+          description?: string | null
           id?: string
-          image: string
-          location: string
+          image?: string | null
+          location?: string | null
           title: string
-          total_slots: number
-          updated_at?: string
+          total_slots?: number
         }
         Update: {
           available_slots?: number
-          created_at?: string
+          created_at?: string | null
           date?: string
-          department?: string
-          description?: string
+          department?: string | null
+          description?: string | null
           id?: string
-          image?: string
-          location?: string
+          image?: string | null
+          location?: string | null
           title?: string
           total_slots?: number
-          updated_at?: string
         }
         Relationships: []
       }
       profiles: {
         Row: {
-          created_at: string
+          email: string | null
           id: string
           name: string
           role: string
-          updated_at: string
         }
         Insert: {
-          created_at?: string
+          email?: string | null
           id: string
           name: string
           role: string
-          updated_at?: string
         }
         Update: {
-          created_at?: string
+          email?: string | null
           id?: string
           name?: string
           role?: string
-          updated_at?: string
         }
         Relationships: []
       }

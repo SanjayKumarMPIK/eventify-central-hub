@@ -29,8 +29,8 @@ export async function fetchEvents(): Promise<Event[]> {
       description: event.description,
       date: event.date,
       location: event.location,
-      department: event.department,
-      image: event.image,
+      department: event.department || 'General',
+      image: event.image || '/placeholder.svg',
       total_slots: event.total_slots,
       available_slots: event.available_slots,
     }));
@@ -38,7 +38,7 @@ export async function fetchEvents(): Promise<Event[]> {
     return eventsData;
   } catch (error: any) {
     console.error("Error fetching events:", error);
-    throw error; // Let the context handle the error
+    throw error;
   }
 }
 
@@ -53,7 +53,7 @@ export async function addEvent(event: Omit<Event, "id">): Promise<Event | null> 
           date: event.date,
           location: event.location,
           total_slots: event.total_slots,
-          available_slots: event.total_slots,
+          available_slots: event.total_slots, // Initially all slots are available
           image: event.image,
           department: event.department,
         },
@@ -62,13 +62,14 @@ export async function addEvent(event: Omit<Event, "id">): Promise<Event | null> 
       .single();
 
     if (error) {
+      console.error("Error adding event:", error);
       throw error;
     }
 
     return data;
   } catch (error: any) {
     console.error("Error adding event:", error);
-    return null;
+    throw error;
   }
 }
 
@@ -77,13 +78,14 @@ export async function deleteEvent(id: string): Promise<boolean> {
     const { error } = await supabase.from("events").delete().eq("id", id);
 
     if (error) {
+      console.error("Error deleting event:", error);
       throw error;
     }
 
     return true;
   } catch (error: any) {
     console.error("Error deleting event:", error);
-    return false;
+    throw error;
   }
 }
 
@@ -97,6 +99,7 @@ export async function increaseEventSlots(id: string, additionalSlots: number): P
       .single();
       
     if (fetchError) {
+      console.error("Error fetching event:", fetchError);
       throw fetchError;
     }
     
@@ -113,12 +116,13 @@ export async function increaseEventSlots(id: string, additionalSlots: number): P
       .single();
 
     if (error) {
+      console.error("Error increasing event slots:", error);
       throw error;
     }
 
     return data;
   } catch (error: any) {
     console.error("Error increasing event slots:", error);
-    return null;
+    throw error;
   }
 }

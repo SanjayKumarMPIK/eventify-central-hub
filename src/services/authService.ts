@@ -67,25 +67,12 @@ export const registerUser = async (name: string, email: string, password: string
 
     if (error) throw error;
 
-    // Create user profile in 'profiles' table
-    if (data.user?.id) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: data.user.id,
-            name: name,
-            role: role,
-            email: email,
-          },
-        ]);
-
-      if (profileError) throw profileError;
-    }
+    // Profile is created automatically via database trigger
+    // No need to create profile manually
 
     toast({
       title: "Success",
-      description: "Registration successful",
+      description: "Registration successful. Please check your email for verification.",
     });
 
     return data;
@@ -128,7 +115,7 @@ export const loginUser = async (email: string, password: string) => {
   }
 }
 
-export const logoutUser = async (): Promise<void> => {
+export const logoutUser = async () => {
   try {
     console.log("Auth service: Logging out user...");
     const { error } = await supabase.auth.signOut();

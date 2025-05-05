@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEvents } from '@/contexts/EventsContext';
 import Navbar from '@/components/Navbar';
@@ -12,7 +12,8 @@ import { toast } from '@/hooks/use-toast';
 
 const DashboardPage = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const { fetchEvents, loading: eventsLoading, events } = useEvents();
+  const { fetchEvents, loading: eventsLoading } = useEvents();
+  const navigate = useNavigate();
 
   // Load events when dashboard mounts
   useEffect(() => {
@@ -53,8 +54,6 @@ const DashboardPage = () => {
   }
 
   console.log("Dashboard rendering for user:", user);
-  console.log("Events loaded:", events.length);
-  console.log("Events loading state:", eventsLoading);
 
   return (
     <>

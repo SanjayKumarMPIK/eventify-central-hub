@@ -38,20 +38,11 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       const eventsData = await eventService.fetchEvents();
       console.log("EventsContext: Events fetched:", eventsData?.length || 0);
       
-      if (Array.isArray(eventsData) && eventsData.length > 0) {
-        console.log("EventsContext: Setting real event data from database");
+      if (Array.isArray(eventsData)) {
         setEvents(eventsData);
       } else {
-        console.log("EventsContext: No events found in database, adding mock data");
-        try {
-          // Import mock events using dynamic import to avoid issues
-          const { mockEvents } = await import('@/services/mockEventService');
-          console.log("EventsContext: Mock events loaded:", mockEvents.length);
-          setEvents(mockEvents);
-        } catch (mockError) {
-          console.warn("EventsContext: Could not load mock events:", mockError);
-          setEvents([]); // Default empty array
-        }
+        console.log("EventsContext: Invalid events data format");
+        setEvents([]);
       }
     } catch (error: any) {
       console.error("EventsContext: Error fetching events:", error);
@@ -60,16 +51,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         description: error.message || "Failed to fetch events",
         variant: "destructive",
       });
-      
-      // Try to use mock data if the real fetch failed
-      try {
-        const { mockEvents } = await import('@/services/mockEventService');
-        console.log("EventsContext: Using mock events after fetch error");
-        setEvents(mockEvents);
-      } catch (mockError) {
-        console.warn("EventsContext: Could not load mock events as fallback:", mockError);
-        setEvents([]); // Default empty array
-      }
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -87,6 +69,10 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       const newEvent = await eventService.addEvent(event);
       if (newEvent) {
         setEvents((prevEvents) => [...prevEvents, newEvent]);
+        toast({
+          title: "Success",
+          description: "Event added successfully",
+        });
       }
     } catch (error: any) {
       console.error("Error adding event:", error);
@@ -157,33 +143,24 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setLoading(true);
     try {
-      const success = await registrationService.registerForEvent(eventId, userId, teamName, teamMembers);
-      if (success) {
-        // Update events state with reduced available slots
-        setEvents((prevEvents) =>
-          prevEvents.map((event) =>
-            event.id === eventId
-              ? { ...event, available_slots: event.available_slots - 1 }
-              : event
-          )
-        );
+      await registrationService.registerForEvent(eventId, userId, teamName, teamMembers);
+      
+      // Update events state with reduced available slots
+      // Not needed since database trigger handles this, but we update the UI for immediate feedback
+      setEvents((prevEvents) =>
+        prevEvents.map((event) =>
+          event.id === eventId
+            ? { ...event, available_slots: Math.max(0, event.available_slots - 1) }
+            : event
+        )
+      );
 
-        toast({
-          title: "Success",
-          description: "Registration successful",
-        });
-
-        if (user) {
-          await getUserRegistrations(user.id);
-        }
-      }
+      // Refresh events from the server to get accurate counts
+      await fetchEvents();
+      
     } catch (error: any) {
       console.error("Error registering for event:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Registration failed",
-        variant: "destructive",
-      });
+      throw error; // Let the component handle the error
     } finally {
       setLoading(false);
     }

@@ -12,7 +12,7 @@ interface AuthContextType {
   loading: boolean;
   register: (name: string, email: string, password: string, role: 'student' | 'admin') => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>; // This stays as Promise<void>
+  logout: () => Promise<void>;
 }
 
 // Create the auth context
@@ -27,7 +27,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
-    // Get initial session
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id);
+      
+      // Only perform synchronous updates here
+      if (session) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+      
+      // Use setTimeout to defer Supabase calls and prevent deadlocks
+      if (session?.user) {
+        setTimeout(async () => {
+          await getUserProfile(session.user.id);
+        }, 0);
+      }
+    });
+
+    // THEN check for existing session
     const getInitialSession = async () => {
       try {
         setLoading(true);
@@ -53,25 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getInitialSession();
 
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.id);
-      setLoading(true);
-      try {
-        if (session) {
-          setIsAuthenticated(true);
-          await getUserProfile(session.user.id);
-        } else {
-          setIsAuthenticated(false);
-          setUser(null);
-        }
-      } catch (error) {
-        console.error("Error handling auth state change:", error);
-      } finally {
-        setLoading(false);
-      }
-    });
-
     return () => {
       subscription.unsubscribe();
     };
@@ -91,6 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Error fetching user profile:", error);
       // If profile not found, log out the user
       await logout();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,6 +107,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({ id: authUser.id, name, role });
         navigate('/dashboard');
       }
+    } catch (error) {
+      console.error("Registration error in context:", error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -114,18 +120,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       await loginUser(email, password);
+      // Auth state listener will handle session updates
       navigate('/dashboard');
+    } catch (error) {
+      console.error("Login error in context:", error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout function - Fixed to ensure proper state cleanup and type compatibility
-  const logout = async (): Promise<void> => { // Explicitly return Promise<void> here
+  // Logout function
+  const logout = async () => {
     setLoading(true);
     try {
       console.log("AuthContext: Logging out user");
-      // Call logoutUser but ignore the boolean return value
       await logoutUser();
       
       // Important: Clear user state AFTER successful logout
@@ -135,8 +144,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Force navigation to home page
       console.log("Navigating to home after logout");
       navigate('/', { replace: true });
-      
-      // No return value needed here as we're returning Promise<void>
     } catch (error) {
       console.error("Logout error in context:", error);
       throw error;
