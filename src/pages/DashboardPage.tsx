@@ -6,7 +6,6 @@ import { useEvents } from '@/contexts/EventsContext';
 import Navbar from '@/components/Navbar';
 import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import StudentDashboard from '@/components/dashboard/StudentDashboard';
-import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 

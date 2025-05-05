@@ -67,9 +67,6 @@ export const registerUser = async (name: string, email: string, password: string
 
     if (error) throw error;
 
-    // Profile is created automatically via database trigger
-    // No need to create profile manually
-
     toast({
       title: "Success",
       description: "Registration successful. Please check your email for verification.",
