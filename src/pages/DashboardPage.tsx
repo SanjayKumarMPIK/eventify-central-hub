@@ -1,33 +1,44 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEvents } from '@/contexts/EventsContext';
 import Navbar from '@/components/Navbar';
 import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import StudentDashboard from '@/components/dashboard/StudentDashboard';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 const DashboardPage = () => {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { fetchEvents, loading: eventsLoading, events } = useEvents();
+
+  // Load events when dashboard mounts
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log("Dashboard mounted, fetching events for user:", user.id);
+      fetchEvents().catch(error => {
+        console.error("Error fetching events in dashboard:", error);
+        toast({
+          title: "Error loading events",
+          description: "There was a problem loading your events. Please try again.",
+          variant: "destructive",
+        });
+      });
+    }
+  }, [isAuthenticated, user, fetchEvents]);
 
   // Show loading state
-  if (loading) {
+  if (authLoading) {
     return (
       <>
         <Navbar />
         <div className="min-h-screen bg-eventify-light py-8">
           <div className="container mx-auto px-4 text-center">
-            <div className="animate-pulse flex flex-col items-center justify-center">
-              <div className="w-48 h-8 bg-gray-200 rounded mb-4"></div>
-              <div className="w-64 h-4 bg-gray-200 rounded mb-12"></div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg shadow-md p-6">
-                    <div className="w-12 h-12 bg-gray-200 rounded mb-4"></div>
-                    <div className="w-3/4 h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="w-1/2 h-4 bg-gray-200 rounded"></div>
-                  </div>
-                ))}
-              </div>
+            <div className="flex flex-col items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-eventify-purple mb-4" />
+              <p className="text-lg">Verifying authentication...</p>
             </div>
           </div>
         </div>
@@ -37,8 +48,13 @@ const DashboardPage = () => {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated || !user) {
+    console.log("User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
+
+  console.log("Dashboard rendering for user:", user);
+  console.log("Events loaded:", events.length);
+  console.log("Events loading state:", eventsLoading);
 
   return (
     <>

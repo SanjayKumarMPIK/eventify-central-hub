@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 const RegisterPage = () => {
   const [name, setName] = useState('');
@@ -17,13 +19,22 @@ const RegisterPage = () => {
   const [role, setRole] = useState<'student' | 'admin'>('student');
   const [adminCode, setAdminCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const { register } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Redirect authenticated users
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (!name || !email || !password || !confirmPassword) {
       toast({
@@ -56,18 +67,20 @@ const RegisterPage = () => {
     setIsLoading(true);
     
     try {
-      await register(name, email, password, role, adminCode);
+      // Remove the adminCode parameter from the register function call
+      await register(name, email, password, role);
       toast({
         title: "Success",
-        description: "Account created successfully",
+        description: "Account created successfully. Please check your email to verify your account.",
       });
-      navigate('/dashboard');
+      // After successful registration, the useEffect will handle redirection
     } catch (error) {
-      toast({
-        title: "Registration Failed",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
-      });
+      console.error('Registration error:', error);
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : "Registration failed. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +108,13 @@ const RegisterPage = () => {
           </CardHeader>
           
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
             <Tabs defaultValue="student" className="w-full mb-6">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger 

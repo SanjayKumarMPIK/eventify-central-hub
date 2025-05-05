@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,23 +19,101 @@ import { useToast } from '@/hooks/use-toast';
 import { Calendar, Clock, MapPin, Users, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import Navbar from '@/components/Navbar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { getEventById, registerForEvent, isUserRegisteredForEvent } = useEvents();
+  const { getEventById, registerForEvent, isUserRegisteredForEvent, loading, events, fetchEvents } = useEvents();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [teamName, setTeamName] = useState('');
   const [teamMembers, setTeamMembers] = useState([
-    { name: user?.name || '', department: '', email: user?.email || '' },
+    { name: user?.name || '', department: '', email: '' },
     { name: '', department: '', email: '' },
   ]);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [registered, setRegistered] = useState<boolean | null>(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
 
   const event = getEventById(id || '');
+
+  useEffect(() => {
+    // Fetch latest events data
+    fetchEvents();
+  }, [fetchEvents]);
+
+  // Check registration status when user or event changes
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      if (user && id) {
+        try {
+          const isRegistered = await isUserRegisteredForEvent(user.id, id);
+          setRegistered(isRegistered);
+        } catch (error) {
+          console.error("Error checking registration status:", error);
+        }
+      }
+    };
+
+    if (events.length > 0) {
+      setLoadingEvent(false);
+      if (user && id) {
+        checkRegistrationStatus();
+      }
+    }
+  }, [user, id, isUserRegisteredForEvent, events]);
+
+  // Show loading skeleton while fetching event data
+  if (loading || loadingEvent) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-eventify-light">
+          <div className="h-64 md:h-80 w-full relative">
+            <Skeleton className="w-full h-full" />
+          </div>
+          
+          <div className="container mx-auto px-4 py-8">
+            <div className="bg-white rounded-lg shadow-md -mt-16 relative z-20 p-6 md:p-8">
+              <div className="flex flex-col md:flex-row justify-between gap-6">
+                <div className="flex-1">
+                  <Skeleton className="h-10 w-2/3 mb-4" />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Skeleton className="w-10 h-10 rounded-full" />
+                        <div>
+                          <Skeleton className="h-4 w-20 mb-1" />
+                          <Skeleton className="h-5 w-32" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <Skeleton className="h-1 w-full my-6" />
+                  
+                  <div>
+                    <Skeleton className="h-6 w-48 mb-4" />
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                </div>
+                
+                <div className="w-full md:w-72 lg:w-96">
+                  <Skeleton className="h-64 w-full rounded-lg" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   if (!event) {
     return (
@@ -54,8 +131,7 @@ const EventDetailPage = () => {
     );
   }
 
-  const isRegistered = user ? isUserRegisteredForEvent(user.id, event.id) : false;
-  const canRegister = event.availableSlots > 0 && !isRegistered;
+  const canRegister = event.available_slots > 0 && registered === false;
   
   const handleMemberChange = (index: number, field: string, value: string) => {
     const updatedMembers = [...teamMembers];
@@ -112,6 +188,7 @@ const EventDetailPage = () => {
     
     try {
       await registerForEvent(event.id, user.id, teamName, teamMembers);
+      setRegistered(true);
       toast({
         title: "Registration successful",
         description: "You have successfully registered for this event!",
@@ -188,8 +265,8 @@ const EventDetailPage = () => {
                     <div>
                       <p className="text-sm text-gray-500">Available Slots</p>
                       <p className="font-medium">
-                        {event.availableSlots} of {event.totalSlots}
-                        {event.availableSlots === 0 && (
+                        {event.available_slots} of {event.total_slots}
+                        {event.available_slots === 0 && (
                           <span className="text-red-500 ml-2 text-sm font-normal">(Full)</span>
                         )}
                       </p>
@@ -211,7 +288,7 @@ const EventDetailPage = () => {
                 <div className="bg-gray-50 p-6 rounded-lg border">
                   <h3 className="text-lg font-semibold mb-4">Registration</h3>
                   
-                  {isRegistered ? (
+                  {registered ? (
                     <div className="text-center py-4">
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-3">
                         <Users className="h-8 w-8 text-green-600" />
