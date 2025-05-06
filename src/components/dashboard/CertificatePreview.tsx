@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,122 +14,133 @@ interface CertificatePreviewProps {
 const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
   const { getEventById, getUserRegistrations } = useEvents();
   const { user } = useAuth();
-  const [registration, setRegistration] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   
   const event = getEventById(eventId);
-  
-  // Fetch registration data when component mounts
-  useEffect(() => {
-    const fetchRegistration = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        const registrations = await getUserRegistrations(user.id);
-        const foundRegistration = registrations.find(reg => reg.eventId === eventId);
-        setRegistration(foundRegistration);
-      } catch (error) {
-        console.error("Error fetching registration:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchRegistration();
-  }, [eventId, user, getUserRegistrations]);
-  
-  if (loading) {
-    return (
-      <div className="text-center p-8">
-        <p>Loading certificate information...</p>
-      </div>
-    );
-  }
   
   if (!event || !user) {
     return (
       <div className="text-center p-8">
-        <p>Certificate information not available</p>
+        <p>Event or user information not found.</p>
       </div>
     );
   }
+  
+  const registrations = getUserRegistrations(user.id);
+  const registration = registrations.find(reg => reg.eventId === eventId);
   
   if (!registration) {
     return (
       <div className="text-center p-8">
-        <p>You are not registered for this event</p>
+        <p>Registration information not found.</p>
       </div>
     );
   }
+
+  const currentDate = format(new Date(), 'MMMM dd, yyyy');
+  const eventDate = format(new Date(event.date), 'MMMM dd, yyyy');
   
-  return (
-    <div className="bg-white border-2 border-gray-200 p-8 rounded-lg shadow-sm relative">
-      {type === 'certificate' ? (
-        <div className="certificate text-center py-8">
-          <div className="border-8 border-double border-gray-300 p-6">
-            <h2 className="text-3xl font-serif mb-6">Certificate of Participation</h2>
+  if (type === 'certificate') {
+    return (
+      <div className="flex flex-col items-center">
+        <div className="w-full p-8 border border-gray-300 rounded-lg bg-white">
+          <div className="border-8 border-eventify-purple/20 p-6 min-h-[400px] relative overflow-hidden">
+            {/* Decorative elements */}
+            <div className="absolute top-0 left-0 w-32 h-32 bg-eventify-purple/5 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+            <div className="absolute bottom-0 right-0 w-32 h-32 bg-eventify-blue/5 rounded-full translate-x-1/2 translate-y-1/2"></div>
             
-            <p className="text-lg mb-8">This is to certify that</p>
-            <p className="text-2xl font-bold mb-3">{user.name}</p>
-            <p className="text-lg mb-6">has successfully participated in</p>
-            <p className="text-xl font-bold mb-3">{event.title}</p>
-            <p className="text-md mb-8">held on {format(new Date(event.date), 'MMMM dd, yyyy')}</p>
-            
-            <div className="mt-12 flex justify-between items-center">
-              <div>
-                <div className="w-20 h-px bg-black mx-auto mb-1"></div>
-                <p>Date</p>
+            <div className="text-center">
+              <div className="text-2xl font-bold bg-gradient-to-r from-eventify-purple to-eventify-blue bg-clip-text text-transparent mb-2">
+                Eventify
               </div>
-              <div>
-                <div className="w-32 h-px bg-black mx-auto mb-1"></div>
-                <p>Event Coordinator</p>
+              <h2 className="text-3xl font-bold text-gray-800 mb-1">Certificate of Participation</h2>
+              <p className="text-gray-500 mb-8">This certifies that</p>
+              
+              <h3 className="text-2xl font-bold text-eventify-purple mb-1">
+                {user.name}
+              </h3>
+              <p className="text-gray-500 mb-8">has successfully participated in</p>
+              
+              <h4 className="text-xl font-bold text-gray-800 mb-2">
+                {event.title}
+              </h4>
+              <p className="text-gray-600">
+                held on {eventDate} at {event.location}
+              </p>
+              
+              <div className="mt-12 flex justify-between items-center">
+                <div className="text-left">
+                  <div className="h-0.5 w-32 bg-gray-400 mb-2"></div>
+                  <p className="text-gray-600">Date: {currentDate}</p>
+                </div>
+                
+                <div className="text-right">
+                  <div className="h-0.5 w-32 bg-gray-400 mb-2"></div>
+                  <p className="text-gray-600">Event Coordinator</p>
+                </div>
+              </div>
+              
+              <div className="absolute bottom-6 right-6 text-xs text-gray-400">
+                Certificate ID: CERT-{event.id}-{user.id}
               </div>
             </div>
           </div>
-          
-          <Button className="mt-6">
-            <Download className="h-4 w-4 mr-2" /> Download Certificate
+        </div>
+        
+        <div className="flex justify-end w-full mt-4">
+          <Button>
+            <Download className="mr-2 h-4 w-4" /> Download Certificate
           </Button>
         </div>
-      ) : (
-        <div className="duty-letter p-8">
-          <div className="text-right mb-6">
-            <p>Date: {format(new Date(), 'MMMM dd, yyyy')}</p>
-          </div>
-          
-          <h2 className="text-xl font-bold mb-6">ON-DUTY CERTIFICATE</h2>
-          
-          <p className="mb-4">TO WHOMSOEVER IT MAY CONCERN</p>
-          
-          <p className="mb-4">
-            This is to certify that <span className="font-semibold">{user.name}</span> participated 
-            in "<span className="font-semibold">{event.title}</span>" organized by our institution 
-            on {format(new Date(event.date), 'MMMM dd, yyyy')}.
-          </p>
-          
-          <p className="mb-8">
-            Kindly treat their absence as on-duty for the mentioned date.
-          </p>
-          
-          <div className="mt-12">
-            <div className="w-32 h-px bg-black mb-1"></div>
-            <p>Event Coordinator</p>
-          </div>
-          
-          <Button className="mt-6">
-            <Download className="h-4 w-4 mr-2" /> Download Letter
-          </Button>
-        </div>
-      )}
-      
-      <div className="absolute top-4 right-4 opacity-30 text-xs">
-        ID: {registration.id}
       </div>
-    </div>
-  );
+    );
+  } else {
+    // On-Duty Letter
+    return (
+      <div className="flex flex-col items-center">
+        <div className="w-full p-8 border border-gray-300 rounded-lg bg-white">
+          <div className="border border-gray-200 p-6 min-h-[500px]">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-eventify-purple to-eventify-blue bg-clip-text text-transparent">
+                Eventify
+              </h2>
+              <p className="text-gray-500">Event Management System</p>
+            </div>
+            
+            <div className="text-right mb-6">
+              <p>Date: {currentDate}</p>
+              <p>Ref: OD-{event.id}-{user.id}</p>
+            </div>
+            
+            <div className="mb-6">
+              <h2 className="text-xl font-bold mb-4 text-center underline">ON DUTY CERTIFICATE</h2>
+            </div>
+            
+            <div className="space-y-4 text-justify">
+              <p>This is to certify that <strong>{user.name}</strong> participated in <strong>"{event.title}"</strong> organized by Eventify on <strong>{eventDate}</strong> at <strong>{event.location}</strong>.</p>
+              
+              <p>The student was on duty during the event hours and should be considered present for their academic commitments during this period.</p>
+              
+              <p className="mb-8">The department is requested to consider this as an authorized absence for academic purposes.</p>
+              
+              <p>Yours sincerely,</p>
+              
+              <div className="mt-8">
+                <div className="h-0.5 w-32 bg-gray-400 mb-2"></div>
+                <p>Event Coordinator</p>
+                <p>Eventify</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-end w-full mt-4">
+          <Button>
+            <Download className="mr-2 h-4 w-4" /> Download Letter
+          </Button>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default CertificatePreview;

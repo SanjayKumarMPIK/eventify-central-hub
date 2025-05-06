@@ -1,219 +1,203 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { Event, EventRegistration, TeamMember } from '@/types/event.types';
-import * as eventService from '@/services/eventService';
-import * as registrationService from '@/services/registrationService';
+import React, { createContext, useContext, useState } from "react";
 
-interface EventContextType {
-  events: Event[];
-  loading: boolean;
-  fetchEvents: () => Promise<void>;
-  getEventById: (id: string) => Event | undefined;
-  addEvent: (event: Omit<Event, "id">) => Promise<void>;
-  deleteEvent: (id: string) => Promise<void>;
-  increaseEventSlots: (id: string, additionalSlots: number) => Promise<void>;
-  registerForEvent: (eventId: string, userId: string, teamName: string, teamMembers: TeamMember[]) => Promise<void>;
-  isUserRegisteredForEvent: (userId: string, eventId: string) => Promise<boolean>;
-  getUserRegistrations: (userId: string) => Promise<EventRegistration[]>;
-  getRegistrationsByEventId: (eventId: string) => Promise<any[]>;
+// Event Interface
+interface Event {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  totalSlots: number;
+  availableSlots: number;
+  image: string;
+  department: string;
 }
 
-const EventsContext = createContext<EventContextType | undefined>(undefined);
+// Registration Interface
+interface EventRegistration {
+  id: string;
+  eventId: string;
+  userId: string;
+  teamName: string;
+  teamMembers: TeamMember[];
+  registrationDate: string;
+}
+
+interface TeamMember {
+  name: string;
+  department: string;
+  email?: string;
+}
+
+interface EventsContextType {
+  events: Event[];
+  registrations: EventRegistration[];
+  addEvent: (event: Omit<Event, "id">) => void;
+  updateEvent: (id: string, updatedEvent: Partial<Event>) => void;
+  deleteEvent: (id: string) => void;
+  registerForEvent: (eventId: string, userId: string, teamName: string, teamMembers: TeamMember[]) => void;
+  getUserRegistrations: (userId: string) => EventRegistration[];
+  getEventById: (id: string) => Event | undefined;
+  getRegistrationsByEventId: (eventId: string) => EventRegistration[];
+  increaseEventSlots: (id: string, additionalSlots: number) => void;
+  isUserRegisteredForEvent: (userId: string, eventId: string) => boolean;
+}
+
+// Initial sample events
+const INITIAL_EVENTS: Event[] = [
+  {
+    id: "1",
+    title: "Web Development Workshop",
+    description: "Learn the fundamentals of web development with HTML, CSS, and JavaScript.",
+    date: "2025-05-15T10:00:00",
+    location: "Computer Science Building, Room 101",
+    totalSlots: 30,
+    availableSlots: 25,
+    image: "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952",
+    department: "Computer Science"
+  },
+  {
+    id: "2",
+    title: "AI and Machine Learning Conference",
+    description: "Explore the latest advancements in artificial intelligence and machine learning.",
+    date: "2025-05-20T09:00:00",
+    location: "Engineering Hall, Auditorium",
+    totalSlots: 100,
+    availableSlots: 85,
+    image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e",
+    department: "Computer Science"
+  },
+  {
+    id: "3",
+    title: "Entrepreneurship Summit",
+    description: "Connect with successful entrepreneurs and learn about starting your own business.",
+    date: "2025-06-05T13:00:00",
+    location: "Business School, Conference Room",
+    totalSlots: 50,
+    availableSlots: 30,
+    image: "https://images.unsplash.com/photo-1551818255-e6e10975bc17",
+    department: "Business Administration"
+  },
+  {
+    id: "4",
+    title: "Robotics Competition",
+    description: "Showcase your robotics skills and compete for exciting prizes.",
+    date: "2025-06-15T10:00:00",
+    location: "Engineering Workshop Area",
+    totalSlots: 20,
+    availableSlots: 12,
+    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158",
+    department: "Mechanical Engineering"
+  }
+];
+
+const EventsContext = createContext<EventsContextType | undefined>(undefined);
 
 export function EventsProvider({ children }: { children: React.ReactNode }) {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-  const { user } = useAuth();
+  const [events, setEvents] = useState<Event[]>(INITIAL_EVENTS);
+  const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
 
-  // Function to fetch events
-  const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      console.log("EventsContext: Fetching events...");
-      
-      // Try to use data from the database
-      const eventsData = await eventService.fetchEvents();
-      console.log("EventsContext: Events fetched:", eventsData?.length || 0);
-      
-      if (Array.isArray(eventsData)) {
-        setEvents(eventsData);
-      } else {
-        console.log("EventsContext: Invalid events data format");
-        setEvents([]);
-      }
-    } catch (error: any) {
-      console.error("EventsContext: Error fetching events:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch events",
-        variant: "destructive",
-      });
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
+  const addEvent = (event: Omit<Event, "id">) => {
+    const newEvent: Event = {
+      ...event,
+      id: `${events.length + 1}`,
+    };
+    setEvents([...events, newEvent]);
   };
 
-  // Function to get event by ID
-  const getEventById = (id: string) => {
-    return events.find(event => event.id === id);
+  const updateEvent = (id: string, updatedEvent: Partial<Event>) => {
+    setEvents(
+      events.map((event) => {
+        if (event.id === id) {
+          return { ...event, ...updatedEvent };
+        }
+        return event;
+      })
+    );
   };
 
-  // Function to add a new event
-  const addEvent = async (event: Omit<Event, "id">) => {
-    setLoading(true);
-    try {
-      const newEvent = await eventService.addEvent(event);
-      if (newEvent) {
-        setEvents((prevEvents) => [...prevEvents, newEvent]);
-        toast({
-          title: "Success",
-          description: "Event added successfully",
-        });
-      }
-    } catch (error: any) {
-      console.error("Error adding event:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add event",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const deleteEvent = (id: string) => {
+    setEvents(events.filter((event) => event.id !== id));
+    // Also remove all registrations for this event
+    setRegistrations(registrations.filter((reg) => reg.eventId !== id));
   };
 
-  // Function to delete an event
-  const deleteEvent = async (id: string) => {
-    setLoading(true);
-    try {
-      const success = await eventService.deleteEvent(id);
-      if (success) {
-        setEvents(events.filter(event => event.id !== id));
-        toast({
-          title: "Success",
-          description: "Event deleted successfully",
-        });
-      }
-    } catch (error: any) {
-      console.error("Error deleting event:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete event",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Function to increase event slots
-  const increaseEventSlots = async (id: string, additionalSlots: number) => {
-    setLoading(true);
-    try {
-      const updatedEvent = await eventService.increaseEventSlots(id, additionalSlots);
-      if (updatedEvent) {
-        setEvents(events.map(e => e.id === id ? updatedEvent : e));
-        toast({
-          title: "Success",
-          description: `Added ${additionalSlots} slots to the event`,
-        });
-      }
-    } catch (error: any) {
-      console.error("Error increasing event slots:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to increase slots",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Function to register for an event
-  const registerForEvent = async (
+  const registerForEvent = (
     eventId: string,
     userId: string,
     teamName: string,
     teamMembers: TeamMember[]
   ) => {
-    setLoading(true);
-    try {
-      await registrationService.registerForEvent(eventId, userId, teamName, teamMembers);
-      
-      // Update events state with reduced available slots
-      // Not needed since database trigger handles this, but we update the UI for immediate feedback
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === eventId
-            ? { ...event, available_slots: Math.max(0, event.available_slots - 1) }
-            : event
-        )
-      );
-
-      // Refresh events from the server to get accurate counts
-      await fetchEvents();
-      
-    } catch (error: any) {
-      console.error("Error registering for event:", error);
-      throw error; // Let the component handle the error
-    } finally {
-      setLoading(false);
+    // Find the event
+    const event = events.find((e) => e.id === eventId);
+    if (!event || event.availableSlots <= 0) {
+      throw new Error("Event not found or no slots available");
     }
-  };
 
-  // Function to check if a user is registered for an event
-  const isUserRegisteredForEvent = async (userId: string, eventId: string) => {
-    return registrationService.isUserRegisteredForEvent(userId, eventId);
-  };
-
-  // Function to get user registrations
-  const getUserRegistrations = async (userId: string): Promise<EventRegistration[]> => {
-    console.log("EventsContext: Getting registrations for user:", userId);
-    try {
-      const registrations = await registrationService.getUserRegistrations(userId);
-      console.log("EventsContext: Got user registrations:", registrations.length);
-      return registrations;
-    } catch (error) {
-      console.error("Error getting user registrations:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch your registrations",
-        variant: "destructive",
-      });
-      return [];
+    // Check if user is already registered
+    if (isUserRegisteredForEvent(userId, eventId)) {
+      throw new Error("You are already registered for this event");
     }
+
+    // Create new registration
+    const newRegistration: EventRegistration = {
+      id: `reg_${registrations.length + 1}`,
+      eventId,
+      userId,
+      teamName,
+      teamMembers,
+      registrationDate: new Date().toISOString(),
+    };
+
+    setRegistrations([...registrations, newRegistration]);
+
+    // Update available slots
+    updateEvent(eventId, { availableSlots: event.availableSlots - 1 });
   };
 
-  // Function to get registrations by event ID
-  const getRegistrationsByEventId = async (eventId: string) => {
-    return registrationService.getRegistrationsByEventId(eventId);
+  const getUserRegistrations = (userId: string) => {
+    return registrations.filter((reg) => reg.userId === userId);
   };
 
-  // Fetch events when the context is first used
-  useEffect(() => {
-    console.log("EventsContext: Initial fetch");
-    fetchEvents();
-  }, []);
+  const getEventById = (id: string) => {
+    return events.find((event) => event.id === id);
+  };
+
+  const getRegistrationsByEventId = (eventId: string) => {
+    return registrations.filter((reg) => reg.eventId === eventId);
+  };
+
+  const increaseEventSlots = (id: string, additionalSlots: number) => {
+    const event = events.find((e) => e.id === id);
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    updateEvent(id, {
+      totalSlots: event.totalSlots + additionalSlots,
+      availableSlots: event.availableSlots + additionalSlots,
+    });
+  };
+
+  const isUserRegisteredForEvent = (userId: string, eventId: string) => {
+    return registrations.some((reg) => reg.userId === userId && reg.eventId === eventId);
+  };
 
   return (
     <EventsContext.Provider
       value={{
         events,
-        loading,
-        fetchEvents,
-        getEventById,
+        registrations,
         addEvent,
+        updateEvent,
         deleteEvent,
-        increaseEventSlots,
         registerForEvent,
-        isUserRegisteredForEvent,
         getUserRegistrations,
-        getRegistrationsByEventId
+        getEventById,
+        getRegistrationsByEventId,
+        increaseEventSlots,
+        isUserRegisteredForEvent,
       }}
     >
       {children}

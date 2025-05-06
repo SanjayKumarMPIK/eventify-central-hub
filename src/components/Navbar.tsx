@@ -9,16 +9,9 @@ const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    console.log("Logout button clicked");
-    try {
-      // Call logout and wait for it to complete
-      await logout();
-      console.log("Logout completed successfully");
-      // No need for navigation here as it's handled in AuthContext
-    } catch (error) {
-      console.error("Error during logout:", error);
-    }
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
   return (
@@ -49,7 +42,7 @@ const Navbar = () => {
             <>
               <div className="hidden md:block text-sm">
                 <span className="text-gray-500">Welcome,</span>{' '}
-                <span className="font-medium">{user?.name || 'User'}</span>
+                <span className="font-medium">{user?.name}</span>
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-eventify-light text-eventify-purple font-medium">
                   {user?.role === 'admin' ? 'Admin' : 'Student'}
                 </span>
