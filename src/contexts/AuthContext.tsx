@@ -217,14 +217,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Logged Out",
         description: "You have been successfully logged out",
       });
-     } //catch (error: any) {
-    //   console.error("Logout error:", error);
-    //   toast({
-    //     title: "Logout Failed",
-    //     description: error.message || "An error occurred during logout",
-    //     variant: "destructive",
-    //   });
-    // }
+     } catch (error: any) {
+      console.error("Logout error:", error);
+      toast({
+        title: "Logout Failed",
+        description: error.message || "An error occurred during logout",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
