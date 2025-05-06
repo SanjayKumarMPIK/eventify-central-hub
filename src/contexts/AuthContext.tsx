@@ -217,7 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Logged Out",
         description: "You have been successfully logged out",
       });
-    // } catch (error: any) {
+     } //catch (error: any) {
     //   console.error("Logout error:", error);
     //   toast({
     //     title: "Logout Failed",
