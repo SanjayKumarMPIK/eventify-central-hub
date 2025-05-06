@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import AdminDashboard from '@/components/dashboard/AdminDashboard';
@@ -8,6 +8,13 @@ import StudentDashboard from '@/components/dashboard/StudentDashboard';
 
 const DashboardPage = () => {
   const { user, isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate('/login');
+    }
+  }, [loading, isAuthenticated, navigate]);
 
   // Show loading state
   if (loading) {

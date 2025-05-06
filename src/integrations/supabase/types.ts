@@ -9,13 +9,139 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      event_registrations: {
+        Row: {
+          event_id: string
+          id: string
+          registration_date: string | null
+          team_name: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          registration_date?: string | null
+          team_name: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          registration_date?: string | null
+          team_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          available_slots: number
+          created_at: string | null
+          date: string
+          department: string | null
+          description: string | null
+          id: string
+          image: string | null
+          location: string | null
+          title: string
+          total_slots: number
+        }
+        Insert: {
+          available_slots?: number
+          created_at?: string | null
+          date: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          image?: string | null
+          location?: string | null
+          title: string
+          total_slots?: number
+        }
+        Update: {
+          available_slots?: number
+          created_at?: string | null
+          date?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          image?: string | null
+          location?: string | null
+          title?: string
+          total_slots?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          email: string | null
+          id: string
+          name: string
+          role: string
+        }
+        Insert: {
+          email?: string | null
+          id: string
+          name: string
+          role: string
+        }
+        Update: {
+          email?: string | null
+          id?: string
+          name?: string
+          role?: string
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          department: string
+          email: string | null
+          id: string
+          name: string
+          registration_id: string
+        }
+        Insert: {
+          department: string
+          email?: string | null
+          id?: string
+          name: string
+          registration_id: string
+        }
+        Update: {
+          department?: string
+          email?: string | null
+          id?: string
+          name?: string
+          registration_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

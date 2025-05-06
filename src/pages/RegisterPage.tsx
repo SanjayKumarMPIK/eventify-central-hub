@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,9 +18,16 @@ const RegisterPage = () => {
   const [adminCode, setAdminCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { register } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +50,17 @@ const RegisterPage = () => {
       return;
     }
     
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+\.ritchennai\.edu\.in$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Error",
+        description: "Email must be in the format abc.123456@dept.ritchennai.edu.in",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Additional validation for admin registration
     if (role === 'admin' && !adminCode) {
       toast({
@@ -57,18 +75,10 @@ const RegisterPage = () => {
     
     try {
       await register(name, email, password, role, adminCode);
-      toast({
-        title: "Success",
-        description: "Account created successfully",
-      });
-      navigate('/dashboard');
+      // Success toast is shown in AuthContext
+      // Don't navigate - wait for email confirmation
     } catch (error) {
-      toast({
-        title: "Registration Failed",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
-      });
-    } finally {
+      // Error toast is shown in AuthContext
       setIsLoading(false);
     }
   };
@@ -142,11 +152,14 @@ const RegisterPage = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="your@email.com"
+                  placeholder="abc.123456@dept.ritchennai.edu.in"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  Email format: abc.123456@dept.ritchennai.edu.in
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -200,6 +213,10 @@ const RegisterPage = () => {
             </p>
           </CardFooter>
         </Card>
+        
+        <div className="mt-4 text-center text-xs text-gray-500">
+          <p>Make sure your email is in the format: abc.123456@dept.ritchennai.edu.in</p>
+        </div>
       </div>
     </div>
   );
