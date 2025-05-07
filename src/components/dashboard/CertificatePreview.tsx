@@ -1,10 +1,11 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
+import { useCertificates } from '@/hooks/useCertificates';
+import { getCertificate } from '@/services/certificateService';
 
 interface CertificatePreviewProps {
   eventId: string;
@@ -14,8 +15,37 @@ interface CertificatePreviewProps {
 const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
   const { getEventById, getUserRegistrations } = useEvents();
   const { user } = useAuth();
+  const { generateAndDownload, downloadCertificate, isGenerating } = useCertificates();
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const event = getEventById(eventId);
+  
+  useEffect(() => {
+    const checkExistingCertificate = async () => {
+      if (!user || !event) return;
+      
+      try {
+        setIsLoading(true);
+        const existingCert = await getCertificate(user.id, eventId, type);
+        
+        if (existingCert && existingCert.file_path) {
+          // Get download URL for existing certificate
+          const { data } = supabase.storage
+            .from('certificates')
+            .getPublicUrl(existingCert.file_path);
+            
+          setDownloadUrl(data.publicUrl);
+        }
+      } catch (error) {
+        console.error('Error checking for certificate:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkExistingCertificate();
+  }, [user, eventId, type, event]);
   
   if (!event || !user) {
     return (
@@ -38,6 +68,19 @@ const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
 
   const currentDate = format(new Date(), 'MMMM dd, yyyy');
   const eventDate = format(new Date(event.date), 'MMMM dd, yyyy');
+  
+  const handleDownload = async () => {
+    if (downloadUrl) {
+      downloadCertificate(downloadUrl, event.title, type);
+      return;
+    }
+    
+    const url = await generateAndDownload(eventId, type);
+    if (url) {
+      setDownloadUrl(url);
+      downloadCertificate(url, event.title, type);
+    }
+  };
   
   if (type === 'certificate') {
     return (
@@ -87,8 +130,20 @@ const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
         </div>
         
         <div className="flex justify-end w-full mt-4">
-          <Button>
-            <Download className="mr-2 h-4 w-4" /> Download Certificate
+          <Button 
+            disabled={isGenerating || isLoading} 
+            onClick={handleDownload}
+          >
+            {(isGenerating || isLoading) ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                {isGenerating ? "Generating..." : "Loading..."}
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" /> Download Certificate
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -134,8 +189,20 @@ const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
         </div>
         
         <div className="flex justify-end w-full mt-4">
-          <Button>
-            <Download className="mr-2 h-4 w-4" /> Download Letter
+          <Button 
+            disabled={isGenerating || isLoading} 
+            onClick={handleDownload}
+          >
+            {(isGenerating || isLoading) ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                {isGenerating ? "Generating..." : "Loading..."}
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" /> Download Letter
+              </>
+            )}
           </Button>
         </div>
       </div>

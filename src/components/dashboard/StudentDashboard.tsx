@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,17 +19,22 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Calendar, MapPin, Download, FileText } from 'lucide-react';
+import { Calendar, MapPin, Download, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import CertificatePreview from './CertificatePreview';
+import { useCertificates } from '@/hooks/useCertificates';
+import { supabase } from '@/integrations/supabase/client';
 
 const StudentDashboard = () => {
   const { events, getUserRegistrations } = useEvents();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { generateAndDownload, downloadCertificate, isGenerating } = useCertificates();
 
   const [previewEvent, setPreviewEvent] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<'certificate' | 'duty'>('certificate');
+  const [certificates, setCertificates] = useState<Record<string, {id: string, file_path: string, type: string}[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
   
   // Get user registrations
   const userRegistrations = user ? getUserRegistrations(user.id) : [];
@@ -49,6 +53,44 @@ const StudentDashboard = () => {
     };
   }).filter(Boolean);
 
+  useEffect(() => {
+    const fetchCertificates = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        
+        const { data, error } = await supabase
+          .from('certificates')
+          .select('id, event_id, file_path, type')
+          .eq('user_id', user.id);
+          
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          // Group certificates by event_id for easy lookup
+          const certMap: Record<string, any[]> = {};
+          data.forEach(cert => {
+            if (!certMap[cert.event_id]) {
+              certMap[cert.event_id] = [];
+            }
+            certMap[cert.event_id].push(cert);
+          });
+          
+          setCertificates(certMap);
+        }
+      } catch (error) {
+        console.error('Error fetching certificates:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCertificates();
+  }, [user]);
+
   const handlePreviewCertificate = (eventId: string) => {
     setPreviewEvent(eventId);
     setPreviewType('certificate');
@@ -61,6 +103,44 @@ const StudentDashboard = () => {
 
   const closePreview = () => {
     setPreviewEvent(null);
+  };
+  
+  const handleDownload = async (eventId: string, eventTitle: string, type: 'certificate' | 'duty') => {
+    // Check if certificate exists in our certificates state
+    const eventCerts = certificates[eventId] || [];
+    const existingCert = eventCerts.find(cert => cert.type === type);
+    
+    if (existingCert) {
+      // Get download URL for existing certificate
+      const { data } = supabase.storage
+        .from('certificates')
+        .getPublicUrl(existingCert.file_path);
+        
+      downloadCertificate(data.publicUrl, eventTitle, type);
+      return;
+    }
+    
+    // Generate and download
+    const url = await generateAndDownload(eventId, type);
+    if (url) {
+      downloadCertificate(url, eventTitle, type);
+      
+      // Update our certificates state
+      setCertificates(prev => {
+        const updated = { ...prev };
+        if (!updated[eventId]) {
+          updated[eventId] = [];
+        }
+        
+        updated[eventId].push({
+          id: `temp-${Date.now()}`,
+          file_path: url.split('/').slice(-1)[0],
+          type
+        });
+        
+        return updated;
+      });
+    }
   };
 
   return (
@@ -130,6 +210,7 @@ const StudentDashboard = () => {
                         size="icon"
                         className="text-eventify-purple"
                         onClick={() => handlePreviewCertificate(event.id)}
+                        title="View Certificate"
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
@@ -152,7 +233,11 @@ const StudentDashboard = () => {
               </div>
             </div>
             
-            {registeredEvents.length === 0 ? (
+            {isLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-eventify-purple" />
+              </div>
+            ) : registeredEvents.length === 0 ? (
               <div className="text-center py-8 border rounded-lg">
                 <h4 className="font-medium text-gray-600">No certificates available</h4>
                 <p className="text-gray-500 mt-2 mb-4">
@@ -164,33 +249,56 @@ const StudentDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {registeredEvents.map((event: any) => (
-                  <Card key={`cert-${event.registrationId}`}>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{event.title}</CardTitle>
-                      <CardDescription>
-                        Participated on {format(new Date(event.date), 'MMMM dd, yyyy')}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-gray-600">
-                        Certificate for successful participation in this event
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePreviewCertificate(event.id)}
-                      >
-                        Preview
-                      </Button>
-                      <Button size="sm">
-                        <Download className="h-4 w-4 mr-2" /> Download
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
+                {registeredEvents.map((event: any) => {
+                  const hasCertificate = certificates[event.id]?.some(c => c.type === 'certificate');
+                  
+                  return (
+                    <Card key={`cert-${event.registrationId}`}>
+                      <CardHeader>
+                        <CardTitle className="text-lg">{event.title}</CardTitle>
+                        <CardDescription>
+                          Participated on {format(new Date(event.date), 'MMMM dd, yyyy')}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-gray-600">
+                          Certificate for successful participation in this event
+                        </p>
+                        {hasCertificate && (
+                          <div className="mt-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Certificate Generated
+                            </span>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePreviewCertificate(event.id)}
+                        >
+                          Preview
+                        </Button>
+                        <Button 
+                          size="sm"
+                          disabled={isGenerating && previewType === 'certificate' && previewEvent === event.id}
+                          onClick={() => handleDownload(event.id, event.title, 'certificate')}
+                        >
+                          {isGenerating && previewType === 'certificate' && previewEvent === event.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" /> Download
+                            </>
+                          )}
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -207,7 +315,11 @@ const StudentDashboard = () => {
               </div>
             </div>
             
-            {registeredEvents.length === 0 ? (
+            {isLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-eventify-blue" />
+              </div>
+            ) : registeredEvents.length === 0 ? (
               <div className="text-center py-8 border rounded-lg">
                 <h4 className="font-medium text-gray-600">No on-duty letters available</h4>
                 <p className="text-gray-500 mt-2 mb-4">
@@ -219,33 +331,56 @@ const StudentDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {registeredEvents.map((event: any) => (
-                  <Card key={`duty-${event.registrationId}`}>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{event.title}</CardTitle>
-                      <CardDescription>
-                        Event date: {format(new Date(event.date), 'MMMM dd, yyyy')}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-gray-600">
-                        On-duty letter confirming your participation in this event
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePreviewDutyLetter(event.id)}
-                      >
-                        Preview
-                      </Button>
-                      <Button size="sm">
-                        <Download className="h-4 w-4 mr-2" /> Download
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
+                {registeredEvents.map((event: any) => {
+                  const hasDutyLetter = certificates[event.id]?.some(c => c.type === 'duty');
+                  
+                  return (
+                    <Card key={`duty-${event.registrationId}`}>
+                      <CardHeader>
+                        <CardTitle className="text-lg">{event.title}</CardTitle>
+                        <CardDescription>
+                          Event date: {format(new Date(event.date), 'MMMM dd, yyyy')}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-gray-600">
+                          On-duty letter confirming your participation in this event
+                        </p>
+                        {hasDutyLetter && (
+                          <div className="mt-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Letter Generated
+                            </span>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePreviewDutyLetter(event.id)}
+                        >
+                          Preview
+                        </Button>
+                        <Button 
+                          size="sm"
+                          disabled={isGenerating && previewType === 'duty' && previewEvent === event.id}
+                          onClick={() => handleDownload(event.id, event.title, 'duty')}
+                        >
+                          {isGenerating && previewType === 'duty' && previewEvent === event.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" /> Download
+                            </>
+                          )}
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
