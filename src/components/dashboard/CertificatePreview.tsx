@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { Download, Loader2 } from 'lucide-react';
 import { useCertificates } from '@/hooks/useCertificates';
 import { getCertificate } from '@/services/certificateService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CertificatePreviewProps {
   eventId: string;
