@@ -21,7 +21,7 @@ interface AuthContextType {
 }
 
 // Admin code for registering as an admin
-const ADMIN_REGISTRATION_CODE = "ADMIN123";
+const ADMIN_REGISTRATION_CODE = "AdminRitChennai";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
