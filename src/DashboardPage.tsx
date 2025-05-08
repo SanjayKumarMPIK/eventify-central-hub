@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -5,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import AdminDashboard from '@/components/dashboard/AdminDashboard';
 import StudentDashboard from '@/components/dashboard/StudentDashboard';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
 
 const DashboardPage = () => {
   const { user, isAuthenticated, loading } = useAuth();
@@ -55,19 +57,10 @@ const DashboardPage = () => {
         <Navbar />
         <div className="min-h-screen bg-eventify-light py-8">
           <div className="container mx-auto px-4 text-center">
-            <div className="animate-pulse flex flex-col items-center justify-center">
-              <div className="w-48 h-8 bg-gray-200 rounded mb-4"></div>
-              <div className="w-64 h-4 bg-gray-200 rounded mb-12"></div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg shadow-md p-6">
-                    <div className="w-12 h-12 bg-gray-200 rounded mb-4"></div>
-                    <div className="w-3/4 h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="w-1/2 h-4 bg-gray-200 rounded"></div>
-                  </div>
-                ))}
-              </div>
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-eventify-purple" />
             </div>
+            <p className="text-gray-600 mt-2">Loading your dashboard...</p>
           </div>
         </div>
       </>

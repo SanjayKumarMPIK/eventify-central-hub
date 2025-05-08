@@ -1,5 +1,8 @@
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./AuthContext";
 
 // Event Interface
 interface Event {
@@ -33,127 +36,333 @@ interface TeamMember {
 interface EventsContextType {
   events: Event[];
   registrations: EventRegistration[];
-  addEvent: (event: Omit<Event, "id">) => void;
-  updateEvent: (id: string, updatedEvent: Partial<Event>) => void;
-  deleteEvent: (id: string) => void;
-  registerForEvent: (eventId: string, userId: string, teamName: string, teamMembers: TeamMember[]) => void;
+  loading: boolean;
+  addEvent: (event: Omit<Event, "id">) => Promise<void>;
+  updateEvent: (id: string, updatedEvent: Partial<Event>) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
+  registerForEvent: (eventId: string, userId: string, teamName: string, teamMembers: TeamMember[]) => Promise<void>;
   getUserRegistrations: (userId: string) => EventRegistration[];
   getEventById: (id: string) => Event | undefined;
   getRegistrationsByEventId: (eventId: string) => EventRegistration[];
-  increaseEventSlots: (id: string, additionalSlots: number) => void;
+  increaseEventSlots: (id: string, additionalSlots: number) => Promise<void>;
   isUserRegisteredForEvent: (userId: string, eventId: string) => boolean;
+  refreshEvents: () => Promise<void>;
 }
-
-// Initial sample events
-const INITIAL_EVENTS: Event[] = [
-  {
-    id: "1",
-    title: "Web Development Workshop",
-    description: "Learn the fundamentals of web development with HTML, CSS, and JavaScript.",
-    date: "2025-05-15T10:00:00",
-    location: "Computer Science Building, Room 101",
-    totalSlots: 30,
-    availableSlots: 25,
-    image: "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952",
-    department: "Computer Science"
-  },
-  {
-    id: "2",
-    title: "AI and Machine Learning Conference",
-    description: "Explore the latest advancements in artificial intelligence and machine learning.",
-    date: "2025-05-20T09:00:00",
-    location: "Engineering Hall, Auditorium",
-    totalSlots: 100,
-    availableSlots: 85,
-    image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e",
-    department: "Computer Science"
-  },
-  {
-    id: "3",
-    title: "Entrepreneurship Summit",
-    description: "Connect with successful entrepreneurs and learn about starting your own business.",
-    date: "2025-06-05T13:00:00",
-    location: "Business School, Conference Room",
-    totalSlots: 50,
-    availableSlots: 30,
-    image: "https://images.unsplash.com/photo-1551818255-e6e10975bc17",
-    department: "Business Administration"
-  },
-  {
-    id: "4",
-    title: "Robotics Competition",
-    description: "Showcase your robotics skills and compete for exciting prizes.",
-    date: "2025-06-15T10:00:00",
-    location: "Engineering Workshop Area",
-    totalSlots: 20,
-    availableSlots: 12,
-    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158",
-    department: "Mechanical Engineering"
-  }
-];
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
 
 export function EventsProvider({ children }: { children: React.ReactNode }) {
-  const [events, setEvents] = useState<Event[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<Event[]>([]);
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
-  const addEvent = (event: Omit<Event, "id">) => {
-    const newEvent: Event = {
-      ...event,
-      id: `${events.length + 1}`,
+  // Fetch events and registrations on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchEvents(), fetchRegistrations()]);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast({
+          title: "Error loading data",
+          description: "Failed to load events or registrations",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     };
-    setEvents([...events, newEvent]);
+
+    fetchData();
+  }, [user]);
+
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("events")
+        .select("*")
+        .order("date", { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      // Transform to match our interface
+      const formattedEvents: Event[] = data.map((event) => ({
+        id: event.id,
+        title: event.title,
+        description: event.description || "",
+        date: event.date,
+        location: event.location || "",
+        totalSlots: event.total_slots,
+        availableSlots: event.available_slots,
+        image: event.image || "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952",
+        department: event.department || "General",
+      }));
+
+      setEvents(formattedEvents);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      throw error;
+    }
   };
 
-  const updateEvent = (id: string, updatedEvent: Partial<Event>) => {
-    setEvents(
-      events.map((event) => {
-        if (event.id === id) {
-          return { ...event, ...updatedEvent };
-        }
-        return event;
-      })
-    );
+  const fetchRegistrations = async () => {
+    if (!user) {
+      setRegistrations([]);
+      return;
+    }
+
+    try {
+      // Fetch registrations
+      const { data: registrationsData, error: registrationsError } = await supabase
+        .from("event_registrations")
+        .select("*");
+
+      if (registrationsError) throw registrationsError;
+
+      // Fetch team members for each registration
+      const { data: teamMembersData, error: teamMembersError } = await supabase
+        .from("team_members")
+        .select("*");
+
+      if (teamMembersError) throw teamMembersError;
+
+      // Map team members to their registrations
+      const registrationsWithTeamMembers: EventRegistration[] = registrationsData.map((reg) => {
+        const teamMembers = teamMembersData
+          .filter((member) => member.registration_id === reg.id)
+          .map((member) => ({
+            name: member.name,
+            department: member.department,
+            email: member.email || undefined,
+          }));
+
+        return {
+          id: reg.id,
+          eventId: reg.event_id,
+          userId: reg.user_id,
+          teamName: reg.team_name,
+          teamMembers,
+          registrationDate: reg.registration_date,
+        };
+      });
+
+      setRegistrations(registrationsWithTeamMembers);
+    } catch (error) {
+      console.error("Error fetching registrations:", error);
+      throw error;
+    }
   };
 
-  const deleteEvent = (id: string) => {
-    setEvents(events.filter((event) => event.id !== id));
-    // Also remove all registrations for this event
-    setRegistrations(registrations.filter((reg) => reg.eventId !== id));
+  const refreshEvents = async () => {
+    try {
+      await fetchEvents();
+      return;
+    } catch (error) {
+      console.error("Error refreshing events:", error);
+      throw error;
+    }
   };
 
-  const registerForEvent = (
+  const addEvent = async (event: Omit<Event, "id">) => {
+    try {
+      const { data, error } = await supabase
+        .from("events")
+        .insert([
+          {
+            title: event.title,
+            description: event.description,
+            date: event.date,
+            location: event.location,
+            total_slots: event.totalSlots,
+            available_slots: event.availableSlots,
+            image: event.image,
+            department: event.department,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        // Add the new event to the state
+        const newEvent: Event = {
+          id: data[0].id,
+          title: data[0].title,
+          description: data[0].description || "",
+          date: data[0].date,
+          location: data[0].location || "",
+          totalSlots: data[0].total_slots,
+          availableSlots: data[0].available_slots,
+          image: data[0].image || "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952",
+          department: data[0].department || "General",
+        };
+        
+        setEvents((prev) => [...prev, newEvent]);
+      }
+    } catch (error) {
+      console.error("Error adding event:", error);
+      toast({
+        title: "Error adding event",
+        description: "Failed to add the event to the database",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const updateEvent = async (id: string, updatedEvent: Partial<Event>) => {
+    try {
+      // Convert to database format
+      const dbUpdateData: any = {};
+      if (updatedEvent.title !== undefined) dbUpdateData.title = updatedEvent.title;
+      if (updatedEvent.description !== undefined) dbUpdateData.description = updatedEvent.description;
+      if (updatedEvent.date !== undefined) dbUpdateData.date = updatedEvent.date;
+      if (updatedEvent.location !== undefined) dbUpdateData.location = updatedEvent.location;
+      if (updatedEvent.totalSlots !== undefined) dbUpdateData.total_slots = updatedEvent.totalSlots;
+      if (updatedEvent.availableSlots !== undefined) dbUpdateData.available_slots = updatedEvent.availableSlots;
+      if (updatedEvent.image !== undefined) dbUpdateData.image = updatedEvent.image;
+      if (updatedEvent.department !== undefined) dbUpdateData.department = updatedEvent.department;
+
+      const { error } = await supabase
+        .from("events")
+        .update(dbUpdateData)
+        .eq("id", id);
+
+      if (error) throw error;
+
+      // Update local state
+      setEvents((prevEvents) =>
+        prevEvents.map((event) => {
+          if (event.id === id) {
+            return { ...event, ...updatedEvent };
+          }
+          return event;
+        })
+      );
+    } catch (error) {
+      console.error("Error updating event:", error);
+      toast({
+        title: "Error updating event",
+        description: "Failed to update the event in the database",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const deleteEvent = async (id: string) => {
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", id);
+
+      if (error) throw error;
+
+      // Update local state
+      setEvents((prevEvents) => prevEvents.filter((event) => event.id !== id));
+      
+      // Also remove registrations for this event from local state
+      setRegistrations((prevRegistrations) => 
+        prevRegistrations.filter((reg) => reg.eventId !== id)
+      );
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast({
+        title: "Error deleting event",
+        description: "Failed to delete the event from the database",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const registerForEvent = async (
     eventId: string,
     userId: string,
     teamName: string,
     teamMembers: TeamMember[]
   ) => {
-    // Find the event
-    const event = events.find((e) => e.id === eventId);
-    if (!event || event.availableSlots <= 0) {
-      throw new Error("Event not found or no slots available");
+    try {
+      // Find the event
+      const event = events.find((e) => e.id === eventId);
+      if (!event || event.availableSlots <= 0) {
+        throw new Error("Event not found or no slots available");
+      }
+
+      // Check if user is already registered
+      if (isUserRegisteredForEvent(userId, eventId)) {
+        throw new Error("You are already registered for this event");
+      }
+
+      // Insert the registration
+      const { data: regData, error: regError } = await supabase
+        .from("event_registrations")
+        .insert([
+          {
+            event_id: eventId,
+            user_id: userId,
+            team_name: teamName,
+            registration_date: new Date().toISOString(),
+          },
+        ])
+        .select();
+
+      if (regError) throw regError;
+
+      if (!regData || regData.length === 0) {
+        throw new Error("Failed to create registration");
+      }
+
+      const registrationId = regData[0].id;
+
+      // Insert team members
+      const teamMembersToInsert = teamMembers.map((member) => ({
+        registration_id: registrationId,
+        name: member.name,
+        department: member.department,
+        email: member.email || null,
+      }));
+
+      const { error: teamError } = await supabase
+        .from("team_members")
+        .insert(teamMembersToInsert);
+
+      if (teamError) throw teamError;
+
+      // Create new registration for local state
+      const newRegistration: EventRegistration = {
+        id: registrationId,
+        eventId,
+        userId,
+        teamName,
+        teamMembers,
+        registrationDate: new Date().toISOString(),
+      };
+
+      setRegistrations((prev) => [...prev, newRegistration]);
+
+      // Update available slots (should be handled by the database trigger)
+      // But update local state to reflect change
+      setEvents((prev) =>
+        prev.map((e) => {
+          if (e.id === eventId) {
+            return { ...e, availableSlots: e.availableSlots - 1 };
+          }
+          return e;
+        })
+      );
+    } catch (error) {
+      console.error("Error registering for event:", error);
+      toast({
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+      throw error;
     }
-
-    // Check if user is already registered
-    if (isUserRegisteredForEvent(userId, eventId)) {
-      throw new Error("You are already registered for this event");
-    }
-
-    // Create new registration
-    const newRegistration: EventRegistration = {
-      id: `reg_${registrations.length + 1}`,
-      eventId,
-      userId,
-      teamName,
-      teamMembers,
-      registrationDate: new Date().toISOString(),
-    };
-
-    setRegistrations([...registrations, newRegistration]);
-
-    // Update available slots
-    updateEvent(eventId, { availableSlots: event.availableSlots - 1 });
   };
 
   const getUserRegistrations = (userId: string) => {
@@ -168,16 +377,48 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     return registrations.filter((reg) => reg.eventId === eventId);
   };
 
-  const increaseEventSlots = (id: string, additionalSlots: number) => {
-    const event = events.find((e) => e.id === id);
-    if (!event) {
-      throw new Error("Event not found");
-    }
+  const increaseEventSlots = async (id: string, additionalSlots: number) => {
+    try {
+      const event = events.find((e) => e.id === id);
+      if (!event) {
+        throw new Error("Event not found");
+      }
 
-    updateEvent(id, {
-      totalSlots: event.totalSlots + additionalSlots,
-      availableSlots: event.availableSlots + additionalSlots,
-    });
+      const newTotalSlots = event.totalSlots + additionalSlots;
+      const newAvailableSlots = event.availableSlots + additionalSlots;
+
+      const { error } = await supabase
+        .from("events")
+        .update({
+          total_slots: newTotalSlots,
+          available_slots: newAvailableSlots,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      // Update local state
+      setEvents((prevEvents) =>
+        prevEvents.map((e) => {
+          if (e.id === id) {
+            return {
+              ...e,
+              totalSlots: newTotalSlots,
+              availableSlots: newAvailableSlots,
+            };
+          }
+          return e;
+        })
+      );
+    } catch (error) {
+      console.error("Error increasing event slots:", error);
+      toast({
+        title: "Error updating event",
+        description: "Failed to increase event slots",
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
 
   const isUserRegisteredForEvent = (userId: string, eventId: string) => {
@@ -189,6 +430,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       value={{
         events,
         registrations,
+        loading,
         addEvent,
         updateEvent,
         deleteEvent,
@@ -198,6 +440,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         getRegistrationsByEventId,
         increaseEventSlots,
         isUserRegisteredForEvent,
+        refreshEvents,
       }}
     >
       {children}

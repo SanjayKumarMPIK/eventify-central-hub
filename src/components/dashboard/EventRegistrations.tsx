@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { format } from 'date-fns';
+import { Loader2 } from 'lucide-react';
 
 interface EventRegistrationsProps {
   selectedEvent: string | null;
@@ -26,7 +27,7 @@ interface EventRegistrationsProps {
 }
 
 const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrationsProps) => {
-  const { events, getRegistrationsByEventId } = useEvents();
+  const { events, getRegistrationsByEventId, loading } = useEvents();
   const [registrations, setRegistrations] = useState<any[]>([]);
   
   useEffect(() => {
@@ -38,6 +39,14 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
       setSelectedEvent(events[0].id);
     }
   }, [selectedEvent, events, getRegistrationsByEventId, setSelectedEvent]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6 flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-eventify-purple" />
+      </div>
+    );
+  }
 
   if (events.length === 0) {
     return (
