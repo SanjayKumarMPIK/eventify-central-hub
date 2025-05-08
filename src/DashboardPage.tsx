@@ -55,10 +55,10 @@ const DashboardPage = () => {
     return (
       <>
         <Navbar />
-        <div className="min-h-screen bg-eventify-light py-8">
+        <div className="min-h-screen bg-eventify-cream py-8">
           <div className="container mx-auto px-4 text-center">
             <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-eventify-purple" />
+              <Loader2 className="h-8 w-8 animate-spin text-eventify-olive" />
             </div>
             <p className="text-gray-600 mt-2">Loading your dashboard...</p>
           </div>
@@ -75,7 +75,7 @@ const DashboardPage = () => {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-eventify-light py-8">
+      <main className="min-h-screen bg-eventify-cream py-8">
         <div className="container mx-auto px-4">
           <div className="bg-white shadow-md rounded-lg p-6 mb-8">
             <h1 className="text-2xl font-bold mb-2">

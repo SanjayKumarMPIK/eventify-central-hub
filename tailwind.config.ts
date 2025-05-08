@@ -64,10 +64,11 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				eventify: {
-					purple: "#6a26cd",
-					blue: "#3e64ff",
-					teal: "#38b2ac",
-					light: "#f7f9fc"
+					olive: "#606c38",  // Dark olive green
+					sage: "#85A879",   // Sage green
+					mint: "#A7CDBD",   // Minty green
+					cream: "#F2F4EB",  // Cream/light background
+					tan: "#DDA15E"     // Accent color for highlights
 				}
 			},
 			borderRadius: {
