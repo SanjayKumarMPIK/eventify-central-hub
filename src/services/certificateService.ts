@@ -1,8 +1,5 @@
-
 import { jsPDF } from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useEvents } from '@/contexts/EventsContext';
 
 // Types for certificate data
 export interface CertificateData {
@@ -176,11 +173,11 @@ export const saveCertificate = async (
     }
     
     // Get public URL for the file
-    const { data: publicURL } = supabase.storage
+    const publicURL = supabase.storage
       .from('certificates')
       .getPublicUrl(filePath);
       
-    return publicURL.publicUrl;
+    return publicURL.data.publicUrl;
   } catch (error) {
     console.error('Error saving certificate:', error);
     return null;

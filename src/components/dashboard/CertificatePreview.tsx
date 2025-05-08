@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useEvents } from '@/contexts/EventsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +38,7 @@ const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
             .getPublicUrl(existingCert.file_path);
             
           setDownloadUrl(data.publicUrl);
+          console.log('Found existing certificate URL:', data.publicUrl);
         }
       } catch (error) {
         console.error('Error checking for certificate:', error);
@@ -71,15 +73,23 @@ const CertificatePreview = ({ eventId, type }: CertificatePreviewProps) => {
   const eventDate = format(new Date(event.date), 'MMMM dd, yyyy');
   
   const handleDownload = async () => {
-    if (downloadUrl) {
-      downloadCertificate(downloadUrl, event.title, type);
-      return;
-    }
-    
-    const url = await generateAndDownload(eventId, type);
-    if (url) {
-      setDownloadUrl(url);
-      downloadCertificate(url, event.title, type);
+    try {
+      if (downloadUrl) {
+        console.log('Using existing download URL:', downloadUrl);
+        downloadCertificate(downloadUrl, event.title, type);
+        return;
+      }
+      
+      console.log('Generating new certificate...');
+      const url = await generateAndDownload(eventId, type);
+      
+      if (url) {
+        console.log('Generated URL:', url);
+        setDownloadUrl(url);
+        downloadCertificate(url, event.title, type);
+      }
+    } catch (error) {
+      console.error('Error in handleDownload:', error);
     }
   };
   

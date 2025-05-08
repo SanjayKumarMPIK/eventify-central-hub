@@ -36,6 +36,7 @@ export const useCertificates = () => {
       if (existingCert) {
         // If exists, return download URL
         const downloadUrl = getCertificateDownloadUrl(existingCert.file_path);
+        console.log('Found existing certificate with URL:', downloadUrl);
         return downloadUrl;
       }
       
@@ -57,6 +58,8 @@ export const useCertificates = () => {
         type
       };
       
+      console.log('Generating PDF for:', certData);
+      
       // Generate PDF
       const pdfBlob = await generateCertificatePDF(certData);
       
@@ -66,6 +69,8 @@ export const useCertificates = () => {
       if (!downloadUrl) {
         throw new Error(`Failed to generate ${type === 'certificate' ? 'certificate' : 'duty letter'}`);
       }
+      
+      console.log('Generated new certificate with URL:', downloadUrl);
       
       toast({
         title: `${type === 'certificate' ? 'Certificate' : 'On-Duty Letter'} Generated`,
@@ -87,13 +92,37 @@ export const useCertificates = () => {
   };
   
   const downloadCertificate = (url: string, eventName: string, type: 'certificate' | 'duty') => {
-    // Create a temporary anchor element
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${eventName.replace(/\s+/g, '_')}_${type}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      console.log('Downloading certificate from URL:', url);
+      
+      // Create a temporary anchor element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${eventName.replace(/\s+/g, '_')}_${type}.pdf`;
+      link.target = '_blank'; // Open in a new tab to better handle direct downloads
+      link.rel = 'noopener noreferrer';
+      
+      // Append link to body, click it, and remove it
+      document.body.appendChild(link);
+      link.click();
+      
+      // Small timeout to ensure the download starts before removing the element
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 100);
+      
+      toast({
+        title: "Download Started",
+        description: `Your ${type === 'certificate' ? 'certificate' : 'duty letter'} download has begun.`,
+      });
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download the document. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return {
