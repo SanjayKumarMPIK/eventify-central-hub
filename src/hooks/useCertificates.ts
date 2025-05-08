@@ -32,7 +32,9 @@ export const useCertificates = () => {
     
     try {
       // Check if certificate already exists
+      console.log('Checking for existing certificate...');
       const existingCert = await getCertificate(user.id, eventId, type);
+      
       if (existingCert) {
         // If exists, return download URL
         const downloadUrl = getCertificateDownloadUrl(existingCert.file_path);
@@ -63,7 +65,7 @@ export const useCertificates = () => {
       // Generate PDF
       const pdfBlob = await generateCertificatePDF(certData);
       
-      // Save to Supabase and get URL
+      // Save to storage and get URL
       const downloadUrl = await saveCertificate(certData, pdfBlob);
       
       if (!downloadUrl) {
