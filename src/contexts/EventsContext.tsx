@@ -374,6 +374,9 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         if (regError.message.includes('No slots available')) {
           throw new Error("Registration failed: No slots available");
         }
+        if (regError.message.includes('Concurrent registration')) {
+          throw new Error("Registration failed: Another user registered at the same time. Please try again.");
+        }
         throw new Error(`Registration failed: ${regError.message}`);
       }
 
@@ -399,6 +402,30 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         console.error("Team members error:", teamError);
         throw new Error(`Failed to add team members: ${teamError.message}`);
       }
+
+      // Update local state
+      setEvents(prevEvents =>
+        prevEvents.map(e => {
+          if (e.id === eventId) {
+            return {
+              ...e,
+              availableSlots: e.availableSlots - 1
+            };
+          }
+          return e;
+        })
+      );
+
+      // Add the new registration to local state
+      const newRegistration: EventRegistration = {
+        id: registrationId,
+        eventId,
+        userId,
+        teamName,
+        teamMembers,
+        registrationDate: new Date().toISOString()
+      };
+      setRegistrations(prev => [...prev, newRegistration]);
 
       toast({
         title: "Registration Successful",
