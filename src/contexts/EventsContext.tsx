@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,40 +57,52 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Fetch events and registrations on mount
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([fetchEvents(), fetchRegistrations()]);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({
-          title: "Error loading data",
-          description: "Failed to load events or registrations",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetchEvents();
+    fetchRegistrations();
 
-    fetchData();
-  }, [user]);
+    // Subscribe to real-time updates for events
+    const eventsSubscription = supabase
+      .channel('events_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'events'
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            setEvents(prevEvents =>
+              prevEvents.map(event =>
+                event.id === payload.new.id
+                  ? {
+                      ...event,
+                      availableSlots: payload.new.available_slots,
+                      totalSlots: payload.new.total_slots
+                    }
+                  : event
+              )
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      eventsSubscription.unsubscribe();
+    };
+  }, []);
 
   const fetchEvents = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: eventsData, error: eventsError } = await supabase
         .from("events")
-        .select("*")
-        .order("date", { ascending: true });
+        .select("*");
 
-      if (error) {
-        throw error;
-      }
+      if (eventsError) throw eventsError;
 
-      // Transform to match our interface
-      const formattedEvents: Event[] = data.map((event) => ({
+      const formattedEvents = eventsData.map((event) => ({
         id: event.id,
         title: event.title,
         description: event.description || "",
@@ -288,8 +299,8 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     try {
       // Find the event
       const event = events.find((e) => e.id === eventId);
-      if (!event || event.availableSlots <= 0) {
-        throw new Error("Event not found or no slots available");
+      if (!event) {
+        throw new Error("Event not found");
       }
 
       // Check if user is already registered
@@ -297,7 +308,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         throw new Error("You are already registered for this event");
       }
 
-      // Insert the registration
+      // Start a transaction
       const { data: regData, error: regError } = await supabase
         .from("event_registrations")
         .insert([
@@ -310,7 +321,12 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         ])
         .select();
 
-      if (regError) throw regError;
+      if (regError) {
+        if (regError.message.includes('No slots available')) {
+          throw new Error("Registration failed: No slots available");
+        }
+        throw regError;
+      }
 
       if (!regData || regData.length === 0) {
         throw new Error("Failed to create registration");
@@ -344,16 +360,10 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
       setRegistrations((prev) => [...prev, newRegistration]);
 
-      // Update available slots (should be handled by the database trigger)
-      // But update local state to reflect change
-      setEvents((prev) =>
-        prev.map((e) => {
-          if (e.id === eventId) {
-            return { ...e, availableSlots: e.availableSlots - 1 };
-          }
-          return e;
-        })
-      );
+      toast({
+        title: "Registration Successful",
+        description: "You have successfully registered for the event",
+      });
     } catch (error) {
       console.error("Error registering for event:", error);
       toast({
