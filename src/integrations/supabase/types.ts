@@ -170,7 +170,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      event_registration_details: {
+        Row: {
+          registration_id: string;
+          registration_date: string;
+          team_name: string;
+          event_id: string;
+          event_title: string;
+          event_date: string;
+          event_location: string;
+          user_id: string;
+          user_name: string;
+          user_email: string;
+          user_role: string;
+          team_members: Array<{
+            name: string;
+            department: string;
+            email: string | null;
+          }>;
+        }
+      }
     }
     Functions: {
       get_user_role: {

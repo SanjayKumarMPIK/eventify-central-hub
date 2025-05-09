@@ -1,7 +1,15 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEvents } from '@/contexts/EventsContext';
-import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Select,
   SelectContent,
@@ -9,48 +17,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { format } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
+import { Database } from '@/integrations/supabase/types';
 
-interface EventRegistrationsProps {
-  selectedEvent: string | null;
-  setSelectedEvent: (id: string | null) => void;
-}
+type RegistrationDetail = Database['public']['Views']['event_registration_details']['Row'];
 
-const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrationsProps) => {
-  const { events, getRegistrationsByEventId, loading } = useEvents();
-  const [registrations, setRegistrations] = useState<any[]>([]);
-  
+const EventRegistrations = () => {
+  const { events } = useEvents();
+  const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [registrations, setRegistrations] = useState<RegistrationDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     if (selectedEvent) {
-      const eventRegistrations = getRegistrationsByEventId(selectedEvent);
-      setRegistrations(eventRegistrations);
-    } else if (events.length > 0) {
-      // If no event is selected, show the first event's registrations
-      setSelectedEvent(events[0].id);
+      fetchRegistrations(selectedEvent);
+    } else {
+      setRegistrations([]);
     }
-  }, [selectedEvent, events, getRegistrationsByEventId, setSelectedEvent]);
+  }, [selectedEvent]);
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6 flex justify-center items-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-eventify-purple" />
-      </div>
-    );
-  }
+  const fetchRegistrations = async (eventId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('event_registration_details')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('registration_date', { ascending: false });
+
+      if (error) throw error;
+
+      setRegistrations(data || []);
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (events.length === 0) {
     return (
-      <div className="text-center py-12 bg-white rounded-lg shadow-md">
+      <div className="text-center py-8">
         <h3 className="text-xl font-medium text-gray-600">No events available</h3>
         <p className="text-gray-500 mt-2">
           Create an event first to manage registrations.
@@ -112,37 +121,55 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
         </div>
       )}
       
-      {registrations.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg">
-          <h3 className="text-lg font-medium text-gray-600">No registrations yet</h3>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      ) : registrations.length === 0 ? (
+        <div className="text-center py-8 border rounded-lg">
+          <h4 className="font-medium text-gray-600">No registrations yet</h4>
           <p className="text-gray-500 mt-2">
-            There are no participants registered for this event.
+            {selectedEvent ? 'No one has registered for this event yet.' : 'Select an event to view registrations.'}
           </p>
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
           <Table>
-            <TableCaption>List of all registered participants</TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead>Team Name</TableHead>
                 <TableHead>Registration Date</TableHead>
-                <TableHead>Team Size</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Team Name</TableHead>
+                <TableHead>Participant</TableHead>
+                <TableHead>Team Members</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {registrations.map((reg) => (
-                <TableRow key={reg.id}>
-                  <TableCell className="font-medium">{reg.teamName}</TableCell>
+                <TableRow key={reg.registration_id}>
                   <TableCell>
-                    {format(new Date(reg.registrationDate), 'MMM dd, yyyy')}
+                    {format(new Date(reg.registration_date), 'MMM dd, yyyy h:mm a')}
                   </TableCell>
-                  <TableCell>{reg.teamMembers.length} members</TableCell>
+                  <TableCell>{reg.team_name}</TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
+                    <div>
+                      <div className="font-medium">{reg.user_name}</div>
+                      <div className="text-sm text-gray-500">{reg.user_email}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {reg.team_members.map((member, index) => (
+                        <div key={index} className="text-sm">
+                          {member.name} ({member.department})
+                        </div>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                      Registered
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}
