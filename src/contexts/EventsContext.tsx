@@ -12,6 +12,7 @@ interface Event {
   location: string;
   totalSlots: number;
   availableSlots: number;
+  registrationCount: number;
   image: string;
   department: string;
 }
@@ -53,7 +54,7 @@ const EventsContext = createContext<EventsContextType | undefined>(undefined);
 export function EventsProvider({ children }: { children: React.ReactNode }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -79,7 +80,8 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
                   ? {
                       ...event,
                       availableSlots: payload.new.available_slots,
-                      totalSlots: payload.new.total_slots
+                      totalSlots: payload.new.total_slots,
+                      registrationCount: payload.new.registration_count
                     }
                   : event
               )
@@ -89,10 +91,54 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
+    // Subscribe to real-time updates for registrations
+    const registrationsSubscription = supabase
+      .channel('registrations_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'event_registrations'
+        },
+        async (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new.user_id === user?.id) {
+            // Fetch the new registration with team members
+            const { data: newReg, error } = await supabase
+              .from('event_registrations')
+              .select(`
+                *,
+                team_members (*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (!error && newReg) {
+              const registration: EventRegistration = {
+                id: newReg.id,
+                eventId: newReg.event_id,
+                userId: newReg.user_id,
+                teamName: newReg.team_name,
+                teamMembers: newReg.team_members.map((tm: any) => ({
+                  name: tm.name,
+                  department: tm.department,
+                  email: tm.email
+                })),
+                registrationDate: newReg.registration_date
+              };
+
+              setRegistrations(prev => [...prev, registration]);
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       eventsSubscription.unsubscribe();
+      registrationsSubscription.unsubscribe();
     };
-  }, []);
+  }, [user]);
 
   const fetchEvents = async () => {
     try {
@@ -110,6 +156,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         location: event.location || "",
         totalSlots: event.total_slots,
         availableSlots: event.available_slots,
+        registrationCount: event.registration_count,
         image: event.image || "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952",
         department: event.department || "General",
       }));
@@ -128,41 +175,30 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Fetch registrations
       const { data: registrationsData, error: registrationsError } = await supabase
         .from("event_registrations")
-        .select("*");
+        .select(`
+          *,
+          team_members (*)
+        `)
+        .eq('user_id', user.id);
 
       if (registrationsError) throw registrationsError;
 
-      // Fetch team members for each registration
-      const { data: teamMembersData, error: teamMembersError } = await supabase
-        .from("team_members")
-        .select("*");
+      const formattedRegistrations = registrationsData.map((reg) => ({
+        id: reg.id,
+        eventId: reg.event_id,
+        userId: reg.user_id,
+        teamName: reg.team_name,
+        teamMembers: reg.team_members.map((tm: any) => ({
+          name: tm.name,
+          department: tm.department,
+          email: tm.email
+        })),
+        registrationDate: reg.registration_date
+      }));
 
-      if (teamMembersError) throw teamMembersError;
-
-      // Map team members to their registrations
-      const registrationsWithTeamMembers: EventRegistration[] = registrationsData.map((reg) => {
-        const teamMembers = teamMembersData
-          .filter((member) => member.registration_id === reg.id)
-          .map((member) => ({
-            name: member.name,
-            department: member.department,
-            email: member.email || undefined,
-          }));
-
-        return {
-          id: reg.id,
-          eventId: reg.event_id,
-          userId: reg.user_id,
-          teamName: reg.team_name,
-          teamMembers,
-          registrationDate: reg.registration_date,
-        };
-      });
-
-      setRegistrations(registrationsWithTeamMembers);
+      setRegistrations(formattedRegistrations);
     } catch (error) {
       console.error("Error fetching registrations:", error);
       throw error;
@@ -209,6 +245,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
           location: data[0].location || "",
           totalSlots: data[0].total_slots,
           availableSlots: data[0].available_slots,
+          registrationCount: data[0].registration_count,
           image: data[0].image || "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952",
           department: data[0].department || "General",
         };
@@ -303,14 +340,6 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Event not found");
       }
 
-      // Log event details for debugging
-      console.log("Event details:", {
-        id: event.id,
-        title: event.title,
-        availableSlots: event.availableSlots,
-        totalSlots: event.totalSlots
-      });
-
       // Check if user is already registered
       if (isUserRegisteredForEvent(userId, eventId)) {
         throw new Error("You are already registered for this event");
@@ -370,18 +399,6 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         console.error("Team members error:", teamError);
         throw new Error(`Failed to add team members: ${teamError.message}`);
       }
-
-      // Create new registration for local state
-      const newRegistration: EventRegistration = {
-        id: registrationId,
-        eventId,
-        userId,
-        teamName,
-        teamMembers,
-        registrationDate: new Date().toISOString(),
-      };
-
-      setRegistrations((prev) => [...prev, newRegistration]);
 
       toast({
         title: "Registration Successful",
