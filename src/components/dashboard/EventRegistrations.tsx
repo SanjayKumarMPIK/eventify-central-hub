@@ -43,7 +43,7 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6 flex justify-center items-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-eventify-olive" />
+        <Loader2 className="h-8 w-8 animate-spin text-eventify-purple" />
       </div>
     );
   }
@@ -89,7 +89,7 @@ const EventRegistrations = ({ selectedEvent, setSelectedEvent }: EventRegistrati
       </div>
       
       {selectedEventObj && (
-        <div className="mb-6 p-4 bg-eventify-cream rounded-md">
+        <div className="mb-6 p-4 bg-gray-50 rounded-md">
           <h3 className="font-medium">{selectedEventObj.title}</h3>
           <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
             <div>
