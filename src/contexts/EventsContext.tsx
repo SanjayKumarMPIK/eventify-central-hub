@@ -303,9 +303,22 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Event not found");
       }
 
+      // Log event details for debugging
+      console.log("Event details:", {
+        id: event.id,
+        title: event.title,
+        availableSlots: event.availableSlots,
+        totalSlots: event.totalSlots
+      });
+
       // Check if user is already registered
       if (isUserRegisteredForEvent(userId, eventId)) {
         throw new Error("You are already registered for this event");
+      }
+
+      // Verify available slots before attempting registration
+      if (event.availableSlots <= 0) {
+        throw new Error("No slots available for this event");
       }
 
       // Start a transaction
@@ -322,14 +335,21 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         .select();
 
       if (regError) {
+        console.error("Registration error details:", {
+          message: regError.message,
+          details: regError.details,
+          hint: regError.hint,
+          code: regError.code
+        });
+
         if (regError.message.includes('No slots available')) {
           throw new Error("Registration failed: No slots available");
         }
-        throw regError;
+        throw new Error(`Registration failed: ${regError.message}`);
       }
 
       if (!regData || regData.length === 0) {
-        throw new Error("Failed to create registration");
+        throw new Error("Failed to create registration: No data returned");
       }
 
       const registrationId = regData[0].id;
@@ -346,7 +366,10 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         .from("team_members")
         .insert(teamMembersToInsert);
 
-      if (teamError) throw teamError;
+      if (teamError) {
+        console.error("Team members error:", teamError);
+        throw new Error(`Failed to add team members: ${teamError.message}`);
+      }
 
       // Create new registration for local state
       const newRegistration: EventRegistration = {
