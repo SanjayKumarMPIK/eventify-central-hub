@@ -47,6 +47,8 @@ interface EventsContextType {
   increaseEventSlots: (id: string, additionalSlots: number) => Promise<void>;
   isUserRegisteredForEvent: (userId: string, eventId: string) => boolean;
   refreshEvents: () => Promise<void>;
+  getEventRegistrations: (eventId: string) => Promise<EventRegistration[]>;
+  getAllRegistrations: () => Promise<EventRegistration[]>;
 }
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
@@ -72,20 +74,36 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
           schema: 'public',
           table: 'events'
         },
-        (payload) => {
+        async (payload) => {
+          console.log('Received event update:', payload);
+          
           if (payload.eventType === 'UPDATE') {
-            setEvents(prevEvents =>
-              prevEvents.map(event =>
-                event.id === payload.new.id
-                  ? {
-                      ...event,
-                      availableSlots: payload.new.available_slots,
-                      totalSlots: payload.new.total_slots,
-                      registrationCount: payload.new.registration_count
-                    }
-                  : event
-              )
-            );
+            // Fetch the complete updated event data
+            const { data: updatedEvent, error } = await supabase
+              .from('events')
+              .select('*')
+              .eq('id', payload.new.id)
+              .single();
+
+            if (error) {
+              console.error('Error fetching updated event:', error);
+              return;
+            }
+
+            if (updatedEvent) {
+              setEvents(prevEvents =>
+                prevEvents.map(event =>
+                  event.id === updatedEvent.id
+                    ? {
+                        ...event,
+                        availableSlots: updatedEvent.available_slots,
+                        totalSlots: updatedEvent.total_slots,
+                        registrationCount: updatedEvent.registration_count || 0
+                      }
+                    : event
+                )
+              );
+            }
           }
         }
       )
@@ -102,13 +120,19 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
           table: 'event_registrations'
         },
         async (payload) => {
-          if (payload.eventType === 'INSERT' && payload.new.user_id === user?.id) {
+          if (payload.eventType === 'INSERT') {
             // Fetch the new registration with team members
             const { data: newReg, error } = await supabase
               .from('event_registrations')
               .select(`
                 *,
-                team_members (*)
+                team_members (*),
+                events (
+                  id,
+                  title,
+                  available_slots,
+                  registration_count
+                )
               `)
               .eq('id', payload.new.id)
               .single();
@@ -128,6 +152,21 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
               };
 
               setRegistrations(prev => [...prev, registration]);
+
+              // Update event data if it's a new registration
+              if (newReg.events) {
+                setEvents(prevEvents =>
+                  prevEvents.map(event =>
+                    event.id === newReg.events.id
+                      ? {
+                          ...event,
+                          availableSlots: newReg.events.available_slots,
+                          registrationCount: newReg.events.registration_count || 0
+                        }
+                      : event
+                  )
+                );
+              }
             }
           }
         }
@@ -142,9 +181,11 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   const fetchEvents = async () => {
     try {
+      setLoading(true);
       const { data: eventsData, error: eventsError } = await supabase
         .from("events")
-        .select("*");
+        .select("*")
+        .order('date', { ascending: true });
 
       if (eventsError) throw eventsError;
 
@@ -156,7 +197,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         location: event.location || "",
         totalSlots: event.total_slots,
         availableSlots: event.available_slots,
-        registrationCount: event.registration_count,
+        registrationCount: event.registration_count || 0,
         image: event.image || "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952",
         department: event.department || "General",
       }));
@@ -165,6 +206,8 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error fetching events:", error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -208,7 +251,6 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const refreshEvents = async () => {
     try {
       await fetchEvents();
-      return;
     } catch (error) {
       console.error("Error refreshing events:", error);
       throw error;
@@ -334,10 +376,23 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     teamMembers: TeamMember[]
   ) => {
     try {
-      // Find the event
-      const event = events.find((e) => e.id === eventId);
-      if (!event) {
-        throw new Error("Event not found");
+      console.log('Starting registration process with:', {
+        eventId,
+        userId,
+        teamName,
+        teamMembersCount: teamMembers.length
+      });
+
+      // First verify the event exists in the database
+      const { data: eventData, error: eventError } = await supabase
+        .from("events")
+        .select("*")
+        .eq("id", eventId)
+        .single();
+
+      if (eventError || !eventData) {
+        console.error("Event lookup error:", eventError);
+        throw new Error("Event not found in database");
       }
 
       // Check if user is already registered
@@ -346,11 +401,11 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Verify available slots before attempting registration
-      if (event.availableSlots <= 0) {
+      if (eventData.available_slots <= 0) {
         throw new Error("No slots available for this event");
       }
 
-      // Start a transaction
+      // Create the registration (slots will be updated by the trigger)
       const { data: regData, error: regError } = await supabase
         .from("event_registrations")
         .insert([
@@ -361,34 +416,29 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
             registration_date: new Date().toISOString(),
           },
         ])
-        .select();
+        .select()
+        .single();
 
       if (regError) {
         console.error("Registration error details:", {
           message: regError.message,
           details: regError.details,
           hint: regError.hint,
-          code: regError.code
+          code: regError.code,
+          stack: regError.stack
         });
-
-        if (regError.message.includes('No slots available')) {
-          throw new Error("Registration failed: No slots available");
-        }
-        if (regError.message.includes('Concurrent registration')) {
-          throw new Error("Registration failed: Another user registered at the same time. Please try again.");
-        }
         throw new Error(`Registration failed: ${regError.message}`);
       }
 
-      if (!regData || regData.length === 0) {
+      if (!regData) {
         throw new Error("Failed to create registration: No data returned");
       }
 
-      const registrationId = regData[0].id;
+      console.log('Registration created successfully:', regData);
 
       // Insert team members
       const teamMembersToInsert = teamMembers.map((member) => ({
-        registration_id: registrationId,
+        registration_id: regData.id,
         name: member.name,
         department: member.department,
         email: member.email || null,
@@ -400,25 +450,17 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
       if (teamError) {
         console.error("Team members error:", teamError);
+        // If we fail to add team members, we should clean up
+        await supabase
+          .from("event_registrations")
+          .delete()
+          .eq("id", regData.id);
         throw new Error(`Failed to add team members: ${teamError.message}`);
       }
 
-      // Update local state
-      setEvents(prevEvents =>
-        prevEvents.map(e => {
-          if (e.id === eventId) {
-            return {
-              ...e,
-              availableSlots: e.availableSlots - 1
-            };
-          }
-          return e;
-        })
-      );
-
       // Add the new registration to local state
       const newRegistration: EventRegistration = {
-        id: registrationId,
+        id: regData.id,
         eventId,
         userId,
         teamName,
@@ -502,6 +544,39 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     return registrations.some((reg) => reg.userId === userId && reg.eventId === eventId);
   };
 
+  // Function to get registrations for admin dashboard
+  const getEventRegistrations = async (eventId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('event_registrations_view')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('registration_date', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching event registrations:', error);
+      throw error;
+    }
+  };
+
+  // Function to get all registrations for admin dashboard
+  const getAllRegistrations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_registrations_view')
+        .select('*')
+        .order('registration_date', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching all registrations:', error);
+      throw error;
+    }
+  };
+
   return (
     <EventsContext.Provider
       value={{
@@ -518,6 +593,8 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         increaseEventSlots,
         isUserRegisteredForEvent,
         refreshEvents,
+        getEventRegistrations,
+        getAllRegistrations,
       }}
     >
       {children}
