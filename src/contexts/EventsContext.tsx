@@ -383,7 +383,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         teamMembersCount: teamMembers.length
       });
 
-      // First verify the event exists in the database
+      // First verify the event exists and has available slots
       const { data: eventData, error: eventError } = await supabase
         .from("events")
         .select("*")
@@ -405,27 +405,20 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         throw new Error("No slots available for this event");
       }
 
-      // Create the registration (slots will be updated by the trigger)
-      const { data: regData, error: regError } = await supabase
-        .from("event_registrations")
-        .insert([
-          {
-            event_id: eventId,
-            user_id: userId,
-            team_name: teamName,
-            registration_date: new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
+      // Start a transaction to ensure atomic updates
+      const { data: regData, error: regError } = await supabase.rpc('register_for_event', {
+        p_event_id: eventId,
+        p_user_id: userId,
+        p_team_name: teamName,
+        p_registration_date: new Date().toISOString()
+      });
 
       if (regError) {
         console.error("Registration error details:", {
           message: regError.message,
           details: regError.details,
           hint: regError.hint,
-          code: regError.code,
-          stack: regError.stack
+          code: regError.code
         });
         throw new Error(`Registration failed: ${regError.message}`);
       }
@@ -468,6 +461,9 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         registrationDate: new Date().toISOString()
       };
       setRegistrations(prev => [...prev, newRegistration]);
+
+      // Refresh events to get updated slot counts
+      await refreshEvents();
 
       toast({
         title: "Registration Successful",
